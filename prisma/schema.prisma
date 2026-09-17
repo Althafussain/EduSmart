@@ -3,25 +3,51 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-enum Role { STUDENT ADMIN TEACHER }
-enum EducationLevel { GRADE O_LEVEL A_LEVEL }
-enum QuestionType { MCQ TRUE_FALSE SHORT_ANSWER ESSAY }
-enum AttemptStatus { IN_PROGRESS SUBMITTED EXPIRED }
-enum EvaluationStatus { PENDING AI_ASSISTED REVIEWED }
+enum Role {
+  STUDENT
+  ADMIN
+  TEACHER
+}
+
+enum EducationLevel {
+  GRADE
+  O_LEVEL
+  A_LEVEL
+}
+
+enum QuestionType {
+  MCQ
+  TRUE_FALSE
+  SHORT_ANSWER
+  ESSAY
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  EXPIRED
+}
+
+enum EvaluationStatus {
+  PENDING
+  AI_ASSISTED
+  REVIEWED
+}
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  passwordHash  String
+  id            String                 @id @default(cuid())
+  email         String                 @unique
+  passwordHash  String?
   fullName      String
   mobileNumber  String?
-  role          Role     @default(STUDENT)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  role          Role                   @default(STUDENT)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
   profile       StudentProfile?
   attempts      ExamAttempt[]
   learning      LearningHistory[]
@@ -29,22 +55,22 @@ model User {
 }
 
 model StudentProfile {
-  id                String         @id @default(cuid())
-  userId            String         @unique
+  id                String            @id @default(cuid())
+  userId            String            @unique
   district          String
   province          String
   schoolName        String
   educationLevel    EducationLevel
   grade             Int?
   stream            String?
-  preferredLanguage String         @default("English")
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferredLanguage String            @default("English")
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   subjects          StudentSubject[]
 }
 
 model Subject {
-  id         String             @id @default(cuid())
-  name       String             @unique
+  id         String                  @id @default(cuid())
+  name       String                  @unique
   students   StudentSubject[]
   exams      Exam[]
   resources  LearningResource[]
@@ -56,6 +82,7 @@ model StudentSubject {
   subjectId        String
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   subject          Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
   @@id([studentProfileId, subjectId])
 }
 
@@ -103,6 +130,7 @@ model ExamAttempt {
   user        User          @relation(fields: [userId], references: [id])
   answers     StudentAnswer[]
   result      Result?
+
   @@unique([examId, userId])
 }
 
@@ -117,6 +145,7 @@ model StudentAnswer {
   modelVersion     String?
   attempt          ExamAttempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   question         Question         @relation(fields: [questionId], references: [id])
+
   @@unique([attemptId, questionId])
 }
 
@@ -166,5 +195,7 @@ model PerformanceAnalytics {
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   subject      Subject  @relation(fields: [subjectId], references: [id])
+
   @@unique([userId, subjectId])
 }
+

@@ -1,5 +1,6 @@
 "use client";
 
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useEffect, useState, type FormEvent } from "react";
 
 const recommendedVideos = [
@@ -8,12 +9,12 @@ const recommendedVideos = [
   { title: "Cell division explained visually", subject: "Biology", level: "A/L • Advanced", duration: "31 min", color: "#e4d8e8", image: "https://images.unsplash.com/photo-1530026405186-ed1f139313f8?auto=format&fit=crop&w=900&q=80" },
 ];
 
-const exams = [
+const defaultExams = [
   { subject: "Combined Mathematics", title: "Term 02 · Functions & Graphs", date: "18 Sep 2026", time: "09:00 AM", duration: "90 min", tone: "mint" },
   { subject: "Physics", title: "Unit 04 · Mechanics", date: "24 Sep 2026", time: "02:00 PM", duration: "60 min", tone: "gold" },
 ];
 
-const questions = [
+const defaultQuestions = [
   "If f(x) = 2x + 3, what is the value of f(4)?",
   "Which statement best describes the gradient of a straight-line graph?",
   "A particle starts from rest and accelerates at 2 ms⁻². Find its speed after 5 seconds.",
@@ -50,14 +51,82 @@ const pageTranslationRows = [
   ["LEARNING, IN MOTION", "ඉගෙනීම, චලනයේ", "கற்றல், இயக்கத்தில்"], ["Your next breakthrough starts here.", "ඔබේ ඊළඟ ජයග්‍රහණය මෙතැනින් ආරම්භ වේ.", "உங்கள் அடுத்த முன்னேற்றம் இங்கே தொடங்குகிறது."], ["One focused space for Sri Lankan students to learn with purpose, practise with confidence, and see their progress clearly.", "ශ්‍රී ලාංකික සිසුන්ට අරමුණකින් ඉගෙනීමට, විශ්වාසයෙන් පුහුණු වීමට සහ ප්‍රගතිය පැහැදිලිව දැකීමට එක් ස්ථානයක්.", "இலங்கை மாணவர்கள் நோக்கத்துடன் கற்கவும், நம்பிக்கையுடன் பயிற்சி செய்யவும், முன்னேற்றத்தைத் தெளிவாகக் காணவும் ஒரே இடம்."], ["Built around your goals", "ඔබේ ඉලක්ක වටා ගොඩනගා ඇත", "உங்கள் இலக்குகளைச் சுற்றி உருவாக்கப்பட்டது"], ["Personalised learning paths for every subject, stream, and stage.", "සෑම විෂයකටම, ධාරාවකටම සහ අදියරකටම පුද්ගලීකරණය කළ ඉගෙනුම් මාර්ග.", "ஒவ்வொரு பாடம், பிரிவு மற்றும் நிலையிற்கும் தனிப்பயன் கற்றல் பாதைகள்."], ["STUDENT SPACE", "ශිෂ්‍ය අවකාශය", "மாணவர் இடம்"], ["WELCOME BACK", "නැවත සාදරයෙන් පිළිගනිමු", "மீண்டும் வரவேற்கிறோம்"], ["Sign in as student", "ශිෂ්‍යයෙකු ලෙස ඇතුළු වන්න", "மாணவராக உள்நுழைக"], ["Create an account", "ගිණුමක් සාදන්න", "கணக்கை உருவாக்கு"], ["Forgot password?", "මුරපදය අමතකද?", "கடவுச்சொல்லை மறந்துவிட்டீர்களா?"], ["Good morning, Nethmi", "සුභ උදෑසනක්, නෙත්මි", "காலை வணக்கம், நேத்மி"], ["Keep learning", "ඉගෙනීම දිගටම කරගෙන යන්න", "தொடர்ந்து கற்றுக்கொள்ளுங்கள்"], ["Upcoming examinations", "ඉදිරි විභාග", "வரவிருக்கும் பரீட்சைகள்"], ["Subject strengths", "විෂය ශක්තීන්", "பாட வலிமைகள்"], ["See all recommendations", "සියලු නිර්දේශ බලන්න", "அனைத்து பரிந்துரைகளையும் காண்க"], ["View calendar", "දින දර්ශනය බලන්න", "நாட்காட்டியைக் காண்க"], ["Stay on track", "මාර්ගයේ රැඳී සිටින්න", "பாதையில் தொடருங்கள்"], ["YOUR PROGRESS", "ඔබේ ප්‍රගතිය", "உங்கள் முன்னேற்றம்"], ["Book shop", "පොත් සාප්පුව", "புத்தகக் கடை"], ["Get trusted revision guides and practice papers delivered to you.", "විශ්වාසදායක පුනරීක්ෂණ මාර්ගෝපදේශ සහ පුහුණු ප්‍රශ්න පත්‍ර ලබා ගන්න.", "நம்பகமான மீளாய்வு வழிகாட்டிகள் மற்றும் பயிற்சி வினாத்தாள்களைப் பெறுங்கள்."], ["Add to basket", "බාස්කට්ටුවට එක් කරන්න", "கூடையில் சேர்"], ["Checkout", "ගෙවීම", "செலுத்துதல்"], ["Settings", "සැකසුම්", "அமைப்புகள்"], ["Profile details", "පැතිකඩ විස්තර", "சுயவிவர விவரங்கள்"], ["Learning experience", "ඉගෙනුම් අත්දැකීම", "கற்றல் அனுபவம்"], ["Study reminders", "අධ්‍යයන මතක් කිරීම්", "படிப்பு நினைவூட்டல்கள்"], ["Compact layout", "සංක්ෂිප්ත පිරිසැලසුම", "சுருக்கமான அமைப்பு"], ["Save settings", "සැකසුම් සුරකින්න", "அமைப்புகளைச் சேமி"], ["Notifications", "දැනුම්දීම්", "அறிவிப்புகள்"], ["Mark all as read", "සියල්ල කියවූ ලෙස සලකුණු කරන්න", "அனைத்தையும் படித்ததாகக் குறிக்கவும்"], ["All caught up", "සියල්ල යාවත්කාලීනයි", "அனைத்தும் படிக்கப்பட்டது"], ["Here to help", "උදව් කිරීමට සූදානම්", "உதவ தயாராக உள்ளது"], ["Ask for support...", "සහාය සඳහා විමසන්න...", "ஆதரவைக் கேளுங்கள்..."], ["My exams", "මගේ විභාග", "என் பரீட்சைகள்"], ["Learning help", "ඉගෙනුම් උදව්", "கற்றல் உதவி"], ["Where are the books?", "පොත් කොහේද?", "புத்தகங்கள் எங்கே?"], ["Send message", "පණිවිඩය යවන්න", "செய்தியை அனுப்பு"] ,
 ] as const;
 
+type PublishedExam = { title: string; subject: string; date: string; time: string; duration: string; tone: string; questions: string[]; fileName: string };
+
+const demoVideoSource = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+
+function VideoPlayerModal({ video, onClose }: { video: (typeof recommendedVideos)[number]; onClose: () => void }) {
+  return <div className="modal-backdrop" onClick={onClose}><section className="video-player-modal" role="dialog" aria-modal="true" aria-labelledby="video-player-title" onClick={(event) => event.stopPropagation()}><div className="video-player-head"><div><span className="eyebrow">NOW PLAYING · {video.subject}</span><h2 id="video-player-title">{video.title}</h2></div><button className="close-button" onClick={onClose} aria-label="Close video player">×</button></div><video className="video-player" controls autoPlay playsInline poster={video.image} src={demoVideoSource}>Your browser does not support video playback.</video><div className="video-player-foot"><span>{video.level}</span><span>{video.duration} lesson</span></div></section></div>;
+}
+
+function ExamUploadForm() {
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState("");
+  const [date, setDate] = useState("");
+  const [duration, setDuration] = useState("60 min");
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+
+  const extractQuestions = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!file) { setError("Choose a PDF or DOCX exam paper first."); return; }
+    setUploading(true); setError(""); setStatus("Extracting question text...");
+    const formData = new FormData(); formData.append("file", file);
+    try {
+      const response = await fetch("/api/admin/exams/upload", { method: "POST", body: formData });
+      const result = await response.json() as { questions?: string[]; error?: string; fileName?: string };
+      if (!response.ok || !result.questions) throw new Error(result.error ?? "The file could not be read.");
+      setQuestions(result.questions); setStatus(`${result.questions.length} question${result.questions.length === 1 ? "" : "s"} extracted from ${result.fileName}.`);
+    } catch (uploadError) { setStatus(""); setError(uploadError instanceof Error ? uploadError.message : "The upload failed."); }
+    finally { setUploading(false); }
+  };
+
+  const publishExam = () => {
+    if (!title || !subject || !date || questions.length === 0) { setError("Add the exam details and extract the questions before publishing."); return; }
+    const publishedExam: PublishedExam = { title, subject, date: new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), time: "09:00 AM", duration, tone: "mint", questions, fileName: file?.name ?? "exam paper" };
+    window.localStorage.setItem("edusmart-published-exam", JSON.stringify(publishedExam));
+    window.dispatchEvent(new Event("edusmart-exam-published"));
+    setStatus("Published to the student portal.");
+  };
+
+  return <section className="admin-form-page"><div className="admin-page-heading"><div><p className="eyebrow">ADMIN ONLY · PDF / DOCX EXTRACTION</p><h2>Exam paper manager</h2><p>Upload a paper, review the extracted questions, then publish it to students.</p></div><span className={status.includes("Published") ? "publish-status live" : "publish-status"}>{status.includes("Published") ? "Published" : "Draft"}</span></div><form className="admin-editor" onSubmit={extractQuestions}><div className="admin-editor-fields"><label>Paper title<input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Term 03 Biology Paper" /></label><label>Subject<input required value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="e.g. Biology" /></label><label>Exam date<input required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>Duration<select value={duration} onChange={(event) => setDuration(event.target.value)}><option>60 min</option><option>90 min</option><option>120 min</option><option>180 min</option></select></label><label className="admin-upload-field">Exam paper file<input required type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><small>PDF or DOCX, maximum 10 MB. Text-based files work best.</small></label></div>{error && <p className="admin-upload-error">{error}</p>}{status && !status.includes("Published") && <p className="admin-upload-status">{status}</p>}{questions.length > 0 && <div className="question-preview"><div><span className="eyebrow">EXTRACTED QUESTIONS</span><strong>{questions.length} ready for review</strong></div><ol>{questions.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ol></div>}<div className="admin-editor-footer"><span>{questions.length > 0 ? "Review the extracted text before publishing." : "Questions remain private until you publish this paper."}</span><div><button type="submit" className="secondary-button" disabled={uploading}>{uploading ? "Reading file..." : "Extract questions"}</button><button type="button" className="primary-button" disabled={questions.length === 0} onClick={publishExam}>Publish to students →</button></div></div></form></section>;
+}
+
+function AdminForm({ title, description, fields, published, onPublish }: { title: string; description: string; fields: string[]; published: boolean; onPublish: () => void }) {
+  if (title === "Exam paper manager") return <ExamUploadForm />;
+  return <section className="admin-form-page"><div className="admin-page-heading"><div><p className="eyebrow">ADMIN ONLY</p><h2>{title}</h2><p>{description}</p></div><span className={published ? "publish-status live" : "publish-status"}>{published ? "Published" : "Draft"}</span></div><form className="admin-editor" onSubmit={(event) => { event.preventDefault(); onPublish(); }}><div className="admin-editor-fields">{fields.map((field) => <label key={field}>{field}<input required placeholder={`Enter ${field.toLowerCase()}`} /></label>)}<label>Description<textarea rows={4} placeholder="Add a short description for students" /></label></div><div className="admin-editor-footer"><span>{published ? "This content is live in the student portal." : "Save as a draft or publish when ready."}</span><div><button type="button" className="secondary-button">Save draft</button><button type="submit" className="primary-button">{published ? "Published ✓" : "Publish to students →"}</button></div></div></form></section>;
+}
+
+function AdminDashboard({ onSignOut }: { onSignOut: () => void }) {
+  const [activeSection, setActiveSection] = useState<"overview" | "exams" | "books" | "videos">("overview");
+  const [examPublished, setExamPublished] = useState(false);
+  const [bookPublished, setBookPublished] = useState(false);
+  const [videoPublished, setVideoPublished] = useState(false);
+  const sections = [["overview", "Overview", "⌂"], ["exams", "Exam papers", "▣"], ["books", "Books", "▤"], ["videos", "Videos", "▶"]] as const;
+
+  return <main className="admin-shell"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div><div className="admin-label">ADMIN CONSOLE</div><nav className="admin-nav" aria-label="Admin navigation">{sections.map(([section, label, icon]) => <button key={section} className={activeSection === section ? "active" : ""} onClick={() => setActiveSection(section)}><span>{icon}</span>{label}</button>)}</nav><button className="admin-signout" onClick={onSignOut}>Sign out <span>↗</span></button></aside><section className="admin-content"><header className="admin-topbar"><div><span className="eyebrow">EDUSMART SRI LANKA</span><h1>Content administration</h1></div><div className="admin-identity"><span className="admin-avatar">AD</span><div><strong>EduSmart Admin</strong><small>Full publishing access</small></div></div></header><div className="admin-page-content">{activeSection === "overview" && <><section className="admin-welcome"><div><p className="eyebrow">CONTROL CENTRE</p><h2>Keep the learning library moving.</h2><p>Only administrators can publish exam papers, books, and video lessons for students.</p></div><span className="admin-lock">⌘</span></section><section className="admin-stats"><div><span>LIVE EXAM PAPERS</span><strong>12</strong><small>2 drafts waiting</small></div><div><span>PUBLISHED BOOKS</span><strong>28</strong><small>4 added this month</small></div><div><span>VIDEO LESSONS</span><strong>46</strong><small>6 pending review</small></div></section><div className="admin-section-grid"><button className="admin-action-card" onClick={() => setActiveSection("exams")}><span className="admin-action-icon">▣</span><strong>Manage exam papers</strong><small>Upload papers, set schedules, and publish assessments.</small><span className="admin-action-link">Open manager →</span></button><button className="admin-action-card" onClick={() => setActiveSection("books")}><span className="admin-action-icon">▤</span><strong>Publish books</strong><small>Add trusted revision guides to the student book shop.</small><span className="admin-action-link">Open manager →</span></button><button className="admin-action-card" onClick={() => setActiveSection("videos")}><span className="admin-action-icon">▶</span><strong>Add video lessons</strong><small>Publish curated lessons to student learning spaces.</small><span className="admin-action-link">Open manager →</span></button></div></>}{activeSection === "exams" && <AdminForm title="Exam paper manager" description="Create and publish an assessment. Students can only see papers after you publish them." published={examPublished} onPublish={() => setExamPublished(true)} fields={["Paper title", "Subject", "Start date and time", "Duration"]} />}{activeSection === "books" && <AdminForm title="Book publishing" description="Add a revision guide to the student book shop when its details are ready." published={bookPublished} onPublish={() => setBookPublished(true)} fields={["Book title", "Author or publisher", "Subject", "Price"]} />}{activeSection === "videos" && <AdminForm title="Video lesson manager" description="Add a lesson link and publish it to the student learning library." published={videoPublished} onPublish={() => setVideoPublished(true)} fields={["Video title", "Video URL", "Subject", "Duration"]} />}</div></section></main>;
+}
+
 function ProfileModal({ onClose, onSignOut }: { onClose: () => void; onSignOut: () => void }) {
   return <div className="modal-backdrop"><section className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title"><div className="profile-modal-head"><div className="profile-hero"><div className="profile-large-avatar">NS</div><div><span className="eyebrow">STUDENT PROFILE</span><h2 id="profile-title">Nethmi Silva</h2><p>Grade 13 · Biological Science</p></div></div><button className="close-button" onClick={onClose} aria-label="Close profile">×</button></div><div className="profile-form"><label>Full name<input defaultValue="Nethmi Silva" /></label><label>Email address<input defaultValue="nethmi.silva@example.com" type="email" /></label><div className="profile-two-col"><label>District<select defaultValue="Colombo"><option>Colombo</option><option>Kandy</option><option>Galle</option><option>Jaffna</option></select></label><label>Province<select defaultValue="Western"><option>Western</option><option>Central</option><option>Southern</option><option>Northern</option></select></label></div><div className="profile-two-col"><label>Education level<select defaultValue="GCE Advanced Level (A/L)"><option>Grade 6–11</option><option>GCE Ordinary Level (O/L)</option><option>GCE Advanced Level (A/L)</option></select></label><label>Preferred language<select defaultValue="English"><option>English</option><option>සිංහල</option><option>தமிழ்</option></select></label></div></div><div className="profile-modal-foot"><button className="signout-button" onClick={onSignOut}>Sign out</button><div><button className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button" onClick={onClose}>Save changes <span>✓</span></button></div></div></section></div>;
 }
 
 export default function Home() {
   const [authenticated, setAuthenticated] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<(typeof recommendedVideos)[number] | null>(null);
+  const [publishedExam, setPublishedExam] = useState<PublishedExam | null>(null);
   const [portal, setPortal] = useState<"student" | "admin">("student");
   const [authView, setAuthView] = useState<"login" | "signup">("login");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [userRole, setUserRole] = useState<"student" | "admin" | null>(null);
   const [activeNav, setActiveNav] = useState("Overview");
   const [examOpen, setExamOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -81,8 +150,143 @@ export default function Home() {
   ]);
   const [assistantInput, setAssistantInput] = useState("");
   const text = translations[language as keyof typeof translations];
+  const questions = publishedExam?.questions.length ? publishedExam.questions : defaultQuestions;
+  const exams = publishedExam ? [publishedExam, ...defaultExams] : defaultExams;
   const languageOptions = ["English", "සිංහල", "தமிழ்"];
+  const currentPortal = userRole === "admin" ? portal : "student";
   const cycleLanguage = () => setLanguage((current) => languageOptions[(languageOptions.indexOf(current) + 1) % languageOptions.length]);
+
+  const syncUserProfile = async (emailValue: string, fullNameValue: string, nextRole: "student" | "admin") => {
+    const response = await fetch("/api/auth/sync-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: emailValue,
+        fullName: fullNameValue,
+        role: nextRole,
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(payload.error ?? "Unable to save your account profile.");
+    }
+  };
+
+  const handleSignOut = async () => {
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    setAuthenticated(false);
+    setUserRole(null);
+    setAuthError("");
+    setAuthMessage("");
+    setPortal("student");
+  };
+
+  const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthError("");
+    setAuthMessage("");
+
+    if (authView === "signup" && educationLevel === "GCE Advanced Level (A/L)" && subjects.length === 0) {
+      setSubjectError(true);
+      return;
+    }
+
+    const supabase = createSupabaseBrowserClient();
+    setAuthLoading(true);
+
+    try {
+      if (authView === "signup") {
+        const nextRole = portal === "admin" ? "admin" : "student";
+
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              full_name: fullName,
+              role: nextRole,
+            },
+          },
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        await syncUserProfile(email, fullName, nextRole);
+
+        if (data.user && !data.session) {
+          setAuthMessage("Account created. Check your email to confirm the registration, then sign in.");
+          setAuthView("login");
+          setPassword("");
+          setFullName("");
+          return;
+        }
+
+        setAuthenticated(true);
+        setUserRole(nextRole);
+        setAuthMessage("Registration successful. You are now signed in.");
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        throw error;
+      }
+
+      const nextRole = portal === "admin" ? "admin" : "student";
+      const sessionRole = data.user?.user_metadata?.role === "admin" ? "admin" : "student";
+
+      if (portal === "admin" && sessionRole !== "admin") {
+        await supabase.auth.signOut();
+        throw new Error("This account is not authorised for the admin portal.");
+      }
+
+      if (data.session) {
+        const savedName = data.user?.user_metadata?.full_name ?? fullName ?? email;
+        await syncUserProfile(email, savedName, nextRole);
+        setAuthenticated(true);
+        setUserRole(sessionRole);
+        setAuthMessage("Signed in successfully.");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Authentication failed.";
+      setAuthError(message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthenticated(Boolean(data.session));
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentRole = session?.user?.user_metadata?.role === "admin" ? "admin" : "student";
+      setAuthenticated(Boolean(session));
+      setUserRole(session ? currentRole : null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadPublishedExam = () => {
+      const storedExam = window.localStorage.getItem("edusmart-published-exam");
+      if (storedExam) setPublishedExam(JSON.parse(storedExam) as PublishedExam);
+    };
+    loadPublishedExam();
+    window.addEventListener("edusmart-exam-published", loadPublishedExam);
+    return () => window.removeEventListener("edusmart-exam-published", loadPublishedExam);
+  }, []);
 
   useEffect(() => {
     if (!examOpen || seconds === 0) return;
@@ -97,6 +301,18 @@ export default function Home() {
     };
     document.addEventListener("click", handleProfileTrigger);
     return () => document.removeEventListener("click", handleProfileTrigger);
+  }, []);
+
+  useEffect(() => {
+    const handleVideoTrigger = (event: MouseEvent) => {
+      const card = (event.target as HTMLElement).closest(".video-card");
+      if (!card) return;
+      const title = card.querySelector("h3")?.textContent;
+      const video = recommendedVideos.find((item) => item.title === title);
+      if (video) setSelectedVideo(video);
+    };
+    document.addEventListener("click", handleVideoTrigger);
+    return () => document.removeEventListener("click", handleVideoTrigger);
   }, []);
 
   useEffect(() => {
@@ -144,13 +360,16 @@ export default function Home() {
           <div className="story-copy"><p className="eyebrow">LEARNING, IN MOTION</p><h1>Your next breakthrough starts here.</h1><p>One focused space for Sri Lankan students to learn with purpose, practise with confidence, and see their progress clearly.</p><div className="story-note"><span>✦</span><div><strong>Built around your goals</strong><br />Personalised learning paths for every subject, stream, and stage.</div></div></div>
           <div className="story-footer">EduSmart Sri Lanka <span>·</span> English <span>·</span> Sinhala <span>·</span> Tamil</div>
         </section>
-        <section className="auth-panel"><div className="auth-card"><div className="auth-card-heading"><p className="eyebrow">WELCOME BACK</p><h2>{authView === "login" ? "Sign in to your space" : "Create your student space"}</h2><p>{portal === "student" ? "Continue your learning journey." : "Manage learning and examinations securely."}</p></div><div className="portal-switch" role="tablist" aria-label="Choose portal"><button className={portal === "student" ? "selected" : ""} onClick={() => { setPortal("student"); setAuthView("login"); }} role="tab" aria-selected={portal === "student"}>Student portal</button><button className={portal === "admin" ? "selected" : ""} onClick={() => { setPortal("admin"); setAuthView("login"); }} role="tab" aria-selected={portal === "admin"}>Admin portal</button></div><form className="auth-form" onSubmit={(event) => { event.preventDefault(); if (authView === "signup" && educationLevel === "GCE Advanced Level (A/L)" && subjects.length === 0) { setSubjectError(true); return; } setAuthenticated(true); }}>{authView === "signup" && <label>Full name<input type="text" placeholder="e.g. Nethmi Silva" required /></label>}<label>Email address<input type="email" placeholder={portal === "admin" ? "admin@school.lk" : "you@example.com"} required /></label><label>Password<input type="password" placeholder="Enter your password" minLength={8} required /></label>{authView === "signup" && <label>Education level<select value={educationLevel} onChange={(event) => { setEducationLevel(event.target.value); setStream(""); setSubjects([]); setSubjectError(false); }} required><option value="" disabled>Select your level</option><option>Grade 6–11</option><option>GCE Ordinary Level (O/L)</option><option>GCE Advanced Level (A/L)</option></select></label>}{authView === "signup" && educationLevel === "GCE Advanced Level (A/L)" && <div className="academic-details"><label>Advanced Level stream<select value={stream} onChange={(event) => { setStream(event.target.value); setSubjects([]); setSubjectError(false); }} required><option value="" disabled>Select your stream</option>{Object.keys(streamSubjects).map((item) => <option key={item}>{item}</option>)}</select></label>{stream && <fieldset className={subjectError ? "subjects-error" : ""}><legend>Subjects</legend><div className="subject-options">{availableSubjects.map((subject) => <label key={subject}><input type="checkbox" checked={subjects.includes(subject)} onChange={() => toggleSubject(subject)} />{subject}</label>)}</div>{subjectError && <p className="field-error">Select at least one subject.</p>}</fieldset>}</div>}{authView === "login" && <button type="button" className="forgot-link">Forgot password?</button>}<button className="auth-submit" type="submit">{authView === "login" ? `Sign in as ${portal === "student" ? "student" : "admin"}` : "Create student account"}<span>→</span></button></form>{portal === "student" && <div className="auth-toggle">{authView === "login" ? "New to EduSmart?" : "Already have an account?"} <button onClick={() => setAuthView(authView === "login" ? "signup" : "login")}>{authView === "login" ? "Create an account" : "Sign in"}</button></div>}{portal === "admin" && <p className="admin-hint">Admin accounts are provisioned by your institution. Use your authorised school credentials to continue.</p>}</div><p className="auth-legal">By continuing, you agree to EduSmart&apos;s terms and privacy policy.</p></section>
+        <section className="auth-panel"><div className="auth-card"><div className="auth-card-heading"><p className="eyebrow">WELCOME BACK</p><h2>{authView === "login" ? "Sign in to your space" : "Create your student space"}</h2><p>{portal === "student" ? "Continue your learning journey." : "Manage learning and examinations securely."}</p></div><div className="portal-switch" role="tablist" aria-label="Choose portal"><button className={portal === "student" ? "selected" : ""} onClick={() => { setPortal("student"); setAuthView("login"); setAuthError(""); setAuthMessage(""); }} role="tab" aria-selected={portal === "student"}>Student portal</button><button className={portal === "admin" ? "selected" : ""} onClick={() => { setPortal("admin"); setAuthView("login"); setAuthError(""); setAuthMessage(""); }} role="tab" aria-selected={portal === "admin"}>Admin portal</button></div><form className="auth-form" onSubmit={handleAuthSubmit}>{authView === "signup" && <label>Full name<input type="text" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="e.g. Nethmi Silva" required /></label>}<label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={portal === "admin" ? "admin@school.lk" : "you@example.com"} required /></label><label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" minLength={8} required /></label>{authView === "signup" && <label>Education level<select value={educationLevel} onChange={(event) => { setEducationLevel(event.target.value); setStream(""); setSubjects([]); setSubjectError(false); }} required><option value="" disabled>Select your level</option><option>Grade 6–11</option><option>GCE Ordinary Level (O/L)</option><option>GCE Advanced Level (A/L)</option></select></label>}{authView === "signup" && educationLevel === "GCE Advanced Level (A/L)" && <div className="academic-details"><label>Advanced Level stream<select value={stream} onChange={(event) => { setStream(event.target.value); setSubjects([]); setSubjectError(false); }} required><option value="" disabled>Select your stream</option>{Object.keys(streamSubjects).map((item) => <option key={item}>{item}</option>)}</select></label>{stream && <fieldset className={subjectError ? "subjects-error" : ""}><legend>Subjects</legend><div className="subject-options">{availableSubjects.map((subject) => <label key={subject}><input type="checkbox" checked={subjects.includes(subject)} onChange={() => toggleSubject(subject)} /> {subject}</label>)}</div>{subjectError && <p className="field-error">Select at least one subject.</p>}</fieldset>}</div>}{authError && <p className="field-error">{authError}</p>}{authMessage && <p className="admin-upload-status">{authMessage}</p>}{authView === "login" && <button type="button" className="forgot-link">Forgot password?</button>}<button className="auth-submit" type="submit" disabled={authLoading}>{authView === "login" ? (authLoading ? "Signing in..." : `Sign in as ${portal === "student" ? "student" : "admin"}`) : (authLoading ? "Creating account..." : "Create student account")}<span>→</span></button></form>{portal === "student" && <div className="auth-toggle">{authView === "login" ? "New to EduSmart?" : "Already have an account?"} <button onClick={() => { setAuthView(authView === "login" ? "signup" : "login"); setAuthError(""); setAuthMessage(""); }}>{authView === "login" ? "Create an account" : "Sign in"}</button></div>}{portal === "admin" && <p className="admin-hint">Admin accounts are provisioned by your institution. Use your authorised school credentials to continue.</p>}</div><p className="auth-legal">By continuing, you agree to EduSmart&apos;s terms and privacy policy.</p></section>
       </main>
     );
   }
 
+  if (currentPortal === "admin") return <AdminDashboard onSignOut={handleSignOut} />;
+
   return (
     <main className="app-shell">
+      {selectedVideo && <VideoPlayerModal video={selectedVideo} onClose={() => setSelectedVideo(null)} />}
       <aside className="sidebar">
         <div className="brand"><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div>
         <div className="school-label">STUDENT SPACE</div>
@@ -201,7 +420,7 @@ export default function Home() {
       </section>
 
       {examOpen && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">COMBINED MATHEMATICS · TERM 02</span><h2 id="exam-title">Functions &amp; Graphs</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body"><div className="question-number">0{question + 1}</div><div className="question-content"><h3>{questions[question]}</h3><label><input type="radio" name="answer" checked={answer === "A"} onChange={() => setAnswer("A")} /> <span>A</span> 11</label><label><input type="radio" name="answer" checked={answer === "B"} onChange={() => setAnswer("B")} /> <span>B</span> 8</label><label><input type="radio" name="answer" checked={answer === "C"} onChange={() => setAnswer("C")} /> <span>C</span> 5</label><label><input type="radio" name="answer" checked={answer === "D"} onChange={() => setAnswer("D")} /> <span>D</span> 6</label></div></div><div className="exam-modal-bottom"><span>Answers save automatically</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => { setQuestion(question + 1); setAnswer(""); }}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => setExamOpen(false)}>Submit exam <span>✓</span></button>}</div></div></section></div>}
-      {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} onSignOut={() => { setProfileOpen(false); setAuthenticated(false); }} />}
+      {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} onSignOut={async () => { setProfileOpen(false); await handleSignOut(); }} />}
       {authenticated && <div className="assistant-widget"><button className="assistant-launcher" onClick={() => setAssistantOpen((open) => !open)} aria-label={assistantOpen ? "Close EduSmart assistant" : "Open EduSmart assistant"}>{assistantOpen ? "×" : "✦"}<span className="assistant-pulse" /></button>{assistantOpen && <section className="assistant-panel" role="dialog" aria-label="EduSmart support assistant"><div className="assistant-head"><div><span className="assistant-avatar">✦</span><div><strong>EduSmart assistant</strong><small>Here to help</small></div></div><button onClick={() => setAssistantOpen(false)} aria-label="Close assistant">×</button></div><div className="assistant-messages">{assistantMessages.map((message, index) => <p className={`assistant-message ${message.from}`} key={`${message.from}-${index}`}>{message.text}</p>)}</div><div className="assistant-quick-actions"><button onClick={() => askAssistant("exams", "Show my exams")}>My exams</button><button onClick={() => askAssistant("learning", "Help with learning")}>Learning help</button><button onClick={() => askAssistant("books", "Where are the books?")}>Book shop</button></div><form className="assistant-form" onSubmit={submitAssistantMessage}><input value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Ask for support..." aria-label="Ask the assistant" /><button type="submit" aria-label="Send message">↑</button></form></section>}</div>}
     </main>
   );
