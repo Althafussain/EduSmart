@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 
+import { getMongoUser } from "@/lib/auth";
+
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -27,6 +29,11 @@ function extractQuestions(text: string) {
 }
 
 export async function POST(request: Request) {
+  const user = await getMongoUser();
+  if (user?.role !== "admin") {
+    return NextResponse.json({ error: "Administrator access is required." }, { status: 403 });
+  }
+
   let formData: FormData;
   try {
     formData = await request.formData();

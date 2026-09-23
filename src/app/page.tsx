@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 
 declare global {
   interface Window {
@@ -15,22 +16,8 @@ declare global {
   }
 }
 
-const recommendedVideos = [
-  { title: "Mastering quadratic equations", subject: "Mathematics", level: "O/L • Intermediate", duration: "18 min", color: "#d6e8e1", image: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=900&q=80" },
-  { title: "Electric circuits: the essentials", subject: "Physics", level: "A/L • Foundation", duration: "24 min", color: "#f4e1c1", image: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80" },
-  { title: "Cell division explained visually", subject: "Biology", level: "A/L • Advanced", duration: "31 min", color: "#e4d8e8", image: "https://images.unsplash.com/photo-1530026405186-ed1f139313f8?auto=format&fit=crop&w=900&q=80" },
-];
-
-const defaultExams = [
-  { subject: "Combined Mathematics", title: "Term 02 · Functions & Graphs", date: "18 Sep 2026", time: "09:00 AM", duration: "90 min", tone: "mint" },
-  { subject: "Physics", title: "Unit 04 · Mechanics", date: "24 Sep 2026", time: "02:00 PM", duration: "60 min", tone: "gold" },
-];
-
-const defaultQuestions = [
-  "If f(x) = 2x + 3, what is the value of f(4)?",
-  "Which statement best describes the gradient of a straight-line graph?",
-  "A particle starts from rest and accelerates at 2 ms⁻². Find its speed after 5 seconds.",
-];
+type VideoCard = { id: string; title: string; subject: string; level: string; duration: string; color: string; image: string; videoUrl: string };
+const recommendedVideos: VideoCard[] = [];
 
 const streamSubjects: Record<string, string[]> = {
   "Biological Science": ["Biology", "Chemistry", "Physics"],
@@ -39,12 +26,7 @@ const streamSubjects: Record<string, string[]> = {
   "Technology": ["Engineering Technology", "Science for Technology", "Information & Communication Technology"],
 };
 
-const books = [
-  { title: "GCE A/L Biology Complete Revision", author: "EduSmart Press", subject: "Biology", level: "A/L", price: "LKR 2,450", color: "mint" },
-  { title: "Combined Mathematics Practice Papers", author: "S. Perera", subject: "Combined Mathematics", level: "A/L", price: "LKR 2,800", color: "gold" },
-  { title: "Physics Concepts and Questions", author: "R. Fernando", subject: "Physics", level: "A/L", price: "LKR 2,250", color: "lilac" },
-  { title: "O/L Science Master Guide", author: "EduSmart Press", subject: "Science", level: "O/L", price: "LKR 1,850", color: "blue" },
-];
+type BookCard = { id: string; title: string; author: string; subject: string; level: string; price: string; color: string; imageUrl: string };
 
 const assistantReplies: Record<string, string> = {
   exams: "You have two upcoming examinations. Combined Mathematics is on 18 Sep at 09:00 AM, followed by Physics on 24 Sep at 02:00 PM.",
@@ -63,12 +45,10 @@ const pageTranslationRows = [
   ["LEARNING, IN MOTION", "ඉගෙනීම, චලනයේ", "கற்றல், இயக்கத்தில்"], ["Your next breakthrough starts here.", "ඔබේ ඊළඟ ජයග්‍රහණය මෙතැනින් ආරම්භ වේ.", "உங்கள் அடுத்த முன்னேற்றம் இங்கே தொடங்குகிறது."], ["One focused space for Sri Lankan students to learn with purpose, practise with confidence, and see their progress clearly.", "ශ්‍රී ලාංකික සිසුන්ට අරමුණකින් ඉගෙනීමට, විශ්වාසයෙන් පුහුණු වීමට සහ ප්‍රගතිය පැහැදිලිව දැකීමට එක් ස්ථානයක්.", "இலங்கை மாணவர்கள் நோக்கத்துடன் கற்கவும், நம்பிக்கையுடன் பயிற்சி செய்யவும், முன்னேற்றத்தைத் தெளிவாகக் காணவும் ஒரே இடம்."], ["Built around your goals", "ඔබේ ඉලක්ක වටා ගොඩනගා ඇත", "உங்கள் இலக்குகளைச் சுற்றி உருவாக்கப்பட்டது"], ["Personalised learning paths for every subject, stream, and stage.", "සෑම විෂයකටම, ධාරාවකටම සහ අදියරකටම පුද්ගලීකරණය කළ ඉගෙනුම් මාර්ග.", "ஒவ்வொரு பாடம், பிரிவு மற்றும் நிலையிற்கும் தனிப்பயன் கற்றல் பாதைகள்."], ["STUDENT SPACE", "ශිෂ්‍ය අවකාශය", "மாணவர் இடம்"], ["WELCOME BACK", "නැවත සාදරයෙන් පිළිගනිමු", "மீண்டும் வரவேற்கிறோம்"], ["Sign in as student", "ශිෂ්‍යයෙකු ලෙස ඇතුළු වන්න", "மாணவராக உள்நுழைக"], ["Create an account", "ගිණුමක් සාදන්න", "கணக்கை உருவாக்கு"], ["Forgot password?", "මුරපදය අමතකද?", "கடவுச்சொல்லை மறந்துவிட்டீர்களா?"], ["Good morning, Nethmi", "සුභ උදෑසනක්, නෙත්මි", "காலை வணக்கம், நேத்மி"], ["Keep learning", "ඉගෙනීම දිගටම කරගෙන යන්න", "தொடர்ந்து கற்றுக்கொள்ளுங்கள்"], ["Upcoming examinations", "ඉදිරි විභාග", "வரவிருக்கும் பரீட்சைகள்"], ["Subject strengths", "විෂය ශක්තීන්", "பாட வலிமைகள்"], ["See all recommendations", "සියලු නිර්දේශ බලන්න", "அனைத்து பரிந்துரைகளையும் காண்க"], ["View calendar", "දින දර්ශනය බලන්න", "நாட்காட்டியைக் காண்க"], ["Stay on track", "මාර්ගයේ රැඳී සිටින්න", "பாதையில் தொடருங்கள்"], ["YOUR PROGRESS", "ඔබේ ප්‍රගතිය", "உங்கள் முன்னேற்றம்"], ["Book shop", "පොත් සාප්පුව", "புத்தகக் கடை"], ["Get trusted revision guides and practice papers delivered to you.", "විශ්වාසදායක පුනරීක්ෂණ මාර්ගෝපදේශ සහ පුහුණු ප්‍රශ්න පත්‍ර ලබා ගන්න.", "நம்பகமான மீளாய்வு வழிகாட்டிகள் மற்றும் பயிற்சி வினாத்தாள்களைப் பெறுங்கள்."], ["Add to basket", "බාස්කට්ටුවට එක් කරන්න", "கூடையில் சேர்"], ["Checkout", "ගෙවීම", "செலுத்துதல்"], ["Settings", "සැකසුම්", "அமைப்புகள்"], ["Profile details", "පැතිකඩ විස්තර", "சுயவிவர விவரங்கள்"], ["Learning experience", "ඉගෙනුම් අත්දැකීම", "கற்றல் அனுபவம்"], ["Study reminders", "අධ්‍යයන මතක් කිරීම්", "படிப்பு நினைவூட்டல்கள்"], ["Compact layout", "සංක්ෂිප්ත පිරිසැලසුම", "சுருக்கமான அமைப்பு"], ["Save settings", "සැකසුම් සුරකින්න", "அமைப்புகளைச் சேமி"], ["Notifications", "දැනුම්දීම්", "அறிவிப்புகள்"], ["Mark all as read", "සියල්ල කියවූ ලෙස සලකුණු කරන්න", "அனைத்தையும் படித்ததாகக் குறிக்கவும்"], ["All caught up", "සියල්ල යාවත්කාලීනයි", "அனைத்தும் படிக்கப்பட்டது"], ["Here to help", "උදව් කිරීමට සූදානම්", "உதவ தயாராக உள்ளது"], ["Ask for support...", "සහාය සඳහා විමසන්න...", "ஆதரவைக் கேளுங்கள்..."], ["My exams", "මගේ විභාග", "என் பரீட்சைகள்"], ["Learning help", "ඉගෙනුම් උදව්", "கற்றல் உதவி"], ["Where are the books?", "පොත් කොහේද?", "புத்தகங்கள் எங்கே?"], ["Send message", "පණිවිඩය යවන්න", "செய்தியை அனுப்பு"] ,
 ] as const;
 
-type PublishedExam = { title: string; subject: string; date: string; time: string; duration: string; tone: string; questions: string[]; fileName: string };
+type PublishedExam = { id: string; title: string; subject: string; date: string; time: string; duration: string; tone: string; questions: string[]; fileName: string };
 
-const demoVideoSource = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
-
-function VideoPlayerModal({ video, onClose }: { video: (typeof recommendedVideos)[number]; onClose: () => void }) {
-  return <div className="modal-backdrop" onClick={onClose}><section className="video-player-modal" role="dialog" aria-modal="true" aria-labelledby="video-player-title" onClick={(event) => event.stopPropagation()}><div className="video-player-head"><div><span className="eyebrow">NOW PLAYING · {video.subject}</span><h2 id="video-player-title">{video.title}</h2></div><button className="close-button" onClick={onClose} aria-label="Close video player">×</button></div><video className="video-player" controls autoPlay playsInline poster={video.image} src={demoVideoSource}>Your browser does not support video playback.</video><div className="video-player-foot"><span>{video.level}</span><span>{video.duration} lesson</span></div></section></div>;
+function VideoPlayerModal({ video, onClose }: { video: VideoCard; onClose: () => void }) {
+  return <div className="modal-backdrop" onClick={onClose}><section className="video-player-modal" role="dialog" aria-modal="true" aria-labelledby="video-player-title" onClick={(event) => event.stopPropagation()}><div className="video-player-head"><div><span className="eyebrow">NOW PLAYING · {video.subject}</span><h2 id="video-player-title">{video.title}</h2></div><button className="close-button" onClick={onClose} aria-label="Close video player">×</button></div><video className="video-player" controls autoPlay playsInline poster={video.image} src={video.videoUrl}>Your browser does not support video playback.</video><div className="video-player-foot"><span>{video.level}</span><span>{video.duration} lesson</span></div></section></div>;
 }
 
 function ExamUploadForm() {
@@ -96,12 +76,17 @@ function ExamUploadForm() {
     finally { setUploading(false); }
   };
 
-  const publishExam = () => {
+  const publishExam = async () => {
     if (!title || !subject || !date || questions.length === 0) { setError("Add the exam details and extract the questions before publishing."); return; }
-    const publishedExam: PublishedExam = { title, subject, date: new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), time: "09:00 AM", duration, tone: "mint", questions, fileName: file?.name ?? "exam paper" };
-    window.localStorage.setItem("edusmart-published-exam", JSON.stringify(publishedExam));
-    window.dispatchEvent(new Event("edusmart-exam-published"));
-    setStatus("Published to the student portal.");
+    setUploading(true); setError("");
+    try {
+      const startsAt = `${date}T09:00:00`;
+      const response = await fetch("/api/admin/exams", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, subject, educationLevel: "GRADE", durationMins: Number.parseInt(duration, 10), totalMarks: questions.length, startsAt, endsAt: `${date}T23:59:00`, published: true, questions }) });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "The exam could not be published.");
+      setStatus("Published to MongoDB and the student portal.");
+    } catch (publishError) { setError(publishError instanceof Error ? publishError.message : "The exam could not be published."); }
+    finally { setUploading(false); }
   };
 
   return <section className="admin-form-page"><div className="admin-page-heading"><div><p className="eyebrow">ADMIN ONLY · PDF / DOCX EXTRACTION</p><h2>Exam paper manager</h2><p>Upload a paper, review the extracted questions, then publish it to students.</p></div><span className={status.includes("Published") ? "publish-status live" : "publish-status"}>{status.includes("Published") ? "Published" : "Draft"}</span></div><form className="admin-editor" onSubmit={extractQuestions}><div className="admin-editor-fields"><label>Paper title<input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Term 03 Biology Paper" /></label><label>Subject<input required value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="e.g. Biology" /></label><label>Exam date<input required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>Duration<select value={duration} onChange={(event) => setDuration(event.target.value)}><option>60 min</option><option>90 min</option><option>120 min</option><option>180 min</option></select></label><label className="admin-upload-field">Exam paper file<input required type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><small>PDF or DOCX, maximum 10 MB. Text-based files work best.</small></label></div>{error && <p className="admin-upload-error">{error}</p>}{status && !status.includes("Published") && <p className="admin-upload-status">{status}</p>}{questions.length > 0 && <div className="question-preview"><div><span className="eyebrow">EXTRACTED QUESTIONS</span><strong>{questions.length} ready for review</strong></div><ol>{questions.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ol></div>}<div className="admin-editor-footer"><span>{questions.length > 0 ? "Review the extracted text before publishing." : "Questions remain private until you publish this paper."}</span><div><button type="submit" className="secondary-button" disabled={uploading}>{uploading ? "Reading file..." : "Extract questions"}</button><button type="button" className="primary-button" disabled={questions.length === 0} onClick={publishExam}>Publish to students →</button></div></div></form></section>;
@@ -112,7 +97,7 @@ function AdminForm({ title, description, fields, published, onPublish }: { title
   return <section className="admin-form-page"><div className="admin-page-heading"><div><p className="eyebrow">ADMIN ONLY</p><h2>{title}</h2><p>{description}</p></div><span className={published ? "publish-status live" : "publish-status"}>{published ? "Published" : "Draft"}</span></div><form className="admin-editor" onSubmit={(event) => { event.preventDefault(); onPublish(); }}><div className="admin-editor-fields">{fields.map((field) => <label key={field}>{field}<input required placeholder={`Enter ${field.toLowerCase()}`} /></label>)}<label>Description<textarea rows={4} placeholder="Add a short description for students" /></label></div><div className="admin-editor-footer"><span>{published ? "This content is live in the student portal." : "Save as a draft or publish when ready."}</span><div><button type="button" className="secondary-button">Save draft</button><button type="submit" className="primary-button">{published ? "Published ✓" : "Publish to students →"}</button></div></div></form></section>;
 }
 
-function AdminDashboard({ onSignOut }: { onSignOut: () => void }) {
+export function AdminDashboard({ onSignOut }: { onSignOut: () => void }) {
   const [activeSection, setActiveSection] = useState<"overview" | "exams" | "books" | "videos">("overview");
   const [examPublished, setExamPublished] = useState(false);
   const [bookPublished, setBookPublished] = useState(false);
@@ -163,10 +148,14 @@ function ProfileModal({ profile, onClose, onSignOut }: { profile: StudentProfile
 }
 
 export default function Home() {
+  const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<(typeof recommendedVideos)[number] | null>(null);
-  const [publishedExam, setPublishedExam] = useState<PublishedExam | null>(null);
   const [portal, setPortal] = useState<"student" | "admin">("student");
+  const [selectedVideo, setSelectedVideo] = useState<(typeof recommendedVideos)[number] | null>(null);
+  const [publishedExam] = useState<PublishedExam | null>(null);
+  const [contentVideos, setContentVideos] = useState<VideoCard[]>([]);
+  const [contentBooks, setContentBooks] = useState<BookCard[]>([]);
+  const [contentExams, setContentExams] = useState<PublishedExam[]>([]);
   const [authView, setAuthView] = useState<"login" | "signup">("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -197,10 +186,10 @@ export default function Home() {
   const [assistantMessages, setAssistantMessages] = useState<{ from: "assistant" | "user"; text: string }[]>([]);
   const [assistantInput, setAssistantInput] = useState("");
   const text = translations[language as keyof typeof translations];
-  const questions = publishedExam?.questions.length ? publishedExam.questions : defaultQuestions;
-  const exams = publishedExam ? [publishedExam, ...defaultExams] : defaultExams;
+  const questions = publishedExam?.questions.length ? publishedExam.questions : contentExams[0]?.questions ?? [];
+  const exams = publishedExam ? [publishedExam, ...contentExams] : contentExams;
   const languageOptions = ["English", "සිංහල", "தமிழ்"];
-  const currentPortal = userRole === "admin" ? portal : "student";
+  const currentPortal = userRole === "admin" ? "admin" : "student";
   const cycleLanguage = () => setLanguage((current) => languageOptions[(languageOptions.indexOf(current) + 1) % languageOptions.length]);
 
   const updateProfileFromUser = (user: AuthResponseUser | null) => {
@@ -220,7 +209,6 @@ export default function Home() {
     setUserRole(null);
     setAuthError("");
     setAuthMessage("");
-    setPortal("student");
   };
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -237,18 +225,17 @@ export default function Home() {
 
     try {
       if (authView === "signup") {
-        const nextRole = portal === "admin" ? "admin" : "student";
-        const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "signup", email, password, fullName, role: nextRole, educationLevel, stream, subjects }) });
+        const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "signup", email, password, fullName, educationLevel, stream, subjects }) });
         const payload = (await response.json()) as { error?: string; user?: AuthResponseUser };
         if (!response.ok || !payload.user) throw new Error(payload.error ?? "Unable to create the account.");
         setAuthenticated(true);
-        setUserRole(nextRole);
+        setUserRole("student");
         updateProfileFromUser(payload.user);
         setAuthMessage("Registration successful. You are now signed in.");
         return;
       }
 
-      const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "signin", email, password, role: portal }) });
+      const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "signin", email, password }) });
       const payload = (await response.json()) as { error?: string; user?: AuthResponseUser };
       if (!response.ok || !payload.user) throw new Error(payload.error ?? "Authentication failed.");
       const sessionRole = payload.user.role === "admin" ? "admin" : "student";
@@ -256,6 +243,7 @@ export default function Home() {
       setAuthenticated(true);
       setUserRole(sessionRole);
       setAuthMessage("Signed in successfully.");
+      if (sessionRole === "admin") router.push("/admin");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Authentication failed.";
       setAuthError(message);
@@ -269,7 +257,7 @@ export default function Home() {
     setAuthMessage("");
     setAuthLoading(true);
     try {
-      const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "google", credential, role: portal }) });
+      const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "google", credential }) });
       const payload = (await response.json()) as { error?: string; user?: AuthResponseUser };
       if (!response.ok || !payload.user) throw new Error(payload.error ?? "Google sign-in failed.");
       const sessionRole = payload.user.role === "admin" ? "admin" : "student";
@@ -277,6 +265,7 @@ export default function Home() {
       setAuthenticated(true);
       setUserRole(sessionRole);
       setAuthMessage("Signed in successfully with Google.");
+      if (sessionRole === "admin") router.push("/admin");
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "Google sign-in failed.");
     } finally {
@@ -285,6 +274,7 @@ export default function Home() {
   };
 
   const googleCredentialHandler = useRef(handleGoogleCredential);
+  const googleInitialized = useRef(false);
   useEffect(() => {
     googleCredentialHandler.current = handleGoogleCredential;
   });
@@ -299,7 +289,10 @@ export default function Home() {
     toggle.append(button);
     const renderButton = () => {
       if (!window.google) return;
-      window.google.accounts.id.initialize({ client_id: clientId, callback: ({ credential }) => googleCredentialHandler.current(credential) });
+      if (!googleInitialized.current) {
+        window.google.accounts.id.initialize({ client_id: clientId, callback: ({ credential }) => googleCredentialHandler.current(credential) });
+        googleInitialized.current = true;
+      }
       window.google.accounts.id.renderButton(button, { theme: "outline", size: "large", width: 350 });
     };
     const script = document.createElement("script");
@@ -309,7 +302,7 @@ export default function Home() {
     document.head.append(script);
     if (window.google) renderButton();
     return () => { button.remove(); script.remove(); };
-  }, [authenticated, authView, portal]);
+  }, [authenticated, authView]);
 
   useEffect(() => {
     fetch("/api/auth").then((response) => response.json()).then((payload: { user?: AuthResponseUser | null }) => {
@@ -320,13 +313,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const loadPublishedExam = () => {
-      const storedExam = window.localStorage.getItem("edusmart-published-exam");
-      if (storedExam) setPublishedExam(JSON.parse(storedExam) as PublishedExam);
-    };
-    loadPublishedExam();
-    window.addEventListener("edusmart-exam-published", loadPublishedExam);
-    return () => window.removeEventListener("edusmart-exam-published", loadPublishedExam);
+    fetch("/api/content").then((response) => response.json()).then((payload: { books?: { id: string; title: string; author: string; subject: string; level: string; price: number; coverColor: string; imageUrl: string | null }[]; videos?: { id: string; title: string; subject: string; level: string; duration: string; thumbnail: string | null; videoUrl: string }[]; exams?: { id: string; title: string; startsAt: string; durationMins: number; subject: { name: string }; questions: { prompt: string }[] }[] }) => {
+      setContentBooks((payload.books ?? []).map((book) => ({ ...book, price: `LKR ${book.price.toLocaleString("en-LK")}`, color: book.coverColor, imageUrl: book.imageUrl ?? "" })));
+      setContentVideos((payload.videos ?? []).map((video) => ({ ...video, color: "#d6e8e1", image: video.thumbnail ?? "" })));
+      setContentExams((payload.exams ?? []).map((exam) => { const start = new Date(exam.startsAt); return { id: exam.id, title: exam.title, subject: exam.subject.name, date: start.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), time: start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }), duration: `${exam.durationMins} min`, tone: "mint", questions: exam.questions.map((question) => question.prompt), fileName: "database exam" }; }));
+    }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -443,18 +434,18 @@ export default function Home() {
           </section>
 
           <section className="section-heading"><div><p className="eyebrow">CURATED FOR YOUR PROFILE</p><h2>Keep learning</h2></div><button className="text-button">See all recommendations <span>→</span></button></section>
-          <section className="video-grid">{recommendedVideos.map((video) => <article className="video-card" key={video.title}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</section>
+          <section className="video-grid">{contentVideos.map((video) => <article className="video-card" key={video.id}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</section>
 
           <div className="lower-grid"><section><div className="section-heading compact"><div><p className="eyebrow">STAY ON TRACK</p><h2>Upcoming examinations</h2></div><button className="text-button">View calendar <span>→</span></button></div><div className="exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.title}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="arrow-button" onClick={() => setExamOpen(true)} aria-label={`Open ${exam.title}`}>↗</button></article>)}</div></section><section className="progress-panel"><div className="section-heading compact"><div><p className="eyebrow">YOUR PROGRESS</p><h2>Subject strengths</h2></div><button className="more-button">•••</button></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></div>
           </>}
 
-          {activeNav === "My learning" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">YOUR PERSONALISED LIBRARY</p><h1>My learning</h1><p className="subtitle">Pick up where you left off and keep your momentum going.</p></div></div><div className="learning-summary"><div><span className="eyebrow">CURRENT FOCUS</span><h2>Physics · Vectors</h2><p>68% complete · 3 lessons remaining</p></div><button className="primary-button">Continue learning <span>→</span></button></div><div className="video-grid">{recommendedVideos.map((video) => <article className="video-card" key={video.title}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</div></section>}
+          {activeNav === "My learning" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">YOUR PERSONALISED LIBRARY</p><h1>My learning</h1><p className="subtitle">Pick up where you left off and keep your momentum going.</p></div></div><div className="learning-summary"><div><span className="eyebrow">CURRENT FOCUS</span><h2>Physics · Vectors</h2><p>68% complete · 3 lessons remaining</p></div><button className="primary-button">Continue learning <span>→</span></button></div><div className="video-grid">{contentVideos.map((video) => <article className="video-card" key={video.id}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</div></section>}
 
           {activeNav === "Examinations" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">ASSESSMENTS AND DEADLINES</p><h1>Examinations</h1><p className="subtitle">Stay prepared for every upcoming assessment.</p></div></div><div className="exam-list nav-exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.title}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="primary-button" onClick={() => setExamOpen(true)}>Open exam <span>→</span></button></article>)}</div></section>}
 
           {activeNav === "Progress" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">YOUR LEARNING JOURNEY</p><h1>Progress</h1><p className="subtitle">See where your effort is turning into results.</p></div></div><div className="stats-grid"><div className="stat-card accent"><div className="stat-label">AVG. PERFORMANCE <span>↗</span></div><div className="stat-value">78<small>%</small></div><div className="stat-foot"><span className="up">↑ 6.4%</span> from last month</div></div><div className="stat-card"><div className="stat-label">LEARNING STREAK <span>↗</span></div><div className="stat-value">12 <small>days</small></div><div className="stat-foot">+3 from last week</div></div><div className="stat-card"><div className="stat-label">HOURS LEARNED <span>↗</span></div><div className="stat-value">24<small>h</small> <em>18m</em></div><div className="stat-foot">Goal: 30h this month</div></div></div><section className="progress-panel progress-page-panel"><div className="section-heading compact"><div><p className="eyebrow">SUBJECT BREAKDOWN</p><h2>Subject strengths</h2></div></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></section>}
 
-          {activeNav === "Book shop" && <section className="nav-page shop-page"><div className="section-heading"><div><p className="eyebrow">STUDY MATERIALS FOR YOUR JOURNEY</p><h1>Book shop</h1><p className="subtitle">Get trusted revision guides and practice papers delivered to you.</p></div><button className="basket-button" onClick={() => setBasket([])} aria-label="Clear basket">Basket <span>{basket.length}</span></button></div><div className="book-grid">{books.map((book) => { const inBasket = basket.includes(book.title); return <article className={`book-card ${book.color}`} key={book.title}><div className="book-cover"><span>{book.level}</span><strong>{book.subject}</strong><i>EduSmart<br />Study Series</i></div><div className="book-copy"><div className="book-meta"><span>{book.subject}</span><span>{book.level}</span></div><h2>{book.title}</h2><p>by {book.author}</p><div className="book-purchase"><strong>{book.price}</strong><button className={inBasket ? "added-button" : "primary-button"} onClick={() => setBasket((current) => inBasket ? current.filter((title) => title !== book.title) : [...current, book.title])}>{inBasket ? "Added ✓" : "Add to basket"}</button></div></div></article>; })}</div>{basket.length > 0 && <div className="basket-bar"><div><strong>{basket.length} {basket.length === 1 ? "book" : "books"} in your basket</strong><span>Ready for checkout</span></div><button className="primary-button" onClick={() => { setBasket([]); window.alert("Your order has been placed successfully."); }}>Checkout <span>→</span></button></div>}</section>}
+          {activeNav === "Book shop" && <section className="nav-page shop-page"><div className="section-heading"><div><p className="eyebrow">STUDY MATERIALS FOR YOUR JOURNEY</p><h1>Book shop</h1><p className="subtitle">Get trusted revision guides and practice papers delivered to you.</p></div><button className="basket-button" onClick={() => setBasket([])} aria-label="Clear basket">Basket <span>{basket.length}</span></button></div><div className="book-grid">{contentBooks.map((book) => { const inBasket = basket.includes(book.title); return <article className={`book-card ${book.color}`} key={book.id}><div className="book-cover" style={book.imageUrl ? { backgroundImage: `url(${book.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}><span>{book.level}</span><strong>{book.subject}</strong><i>EduSmart<br />Study Series</i></div><div className="book-copy"><div className="book-meta"><span>{book.subject}</span><span>{book.level}</span></div><h2>{book.title}</h2><p>by {book.author}</p><div className="book-purchase"><strong>{book.price}</strong><button className={inBasket ? "added-button" : "primary-button"} onClick={() => setBasket((current) => inBasket ? current.filter((title) => title !== book.title) : [...current, book.title])}>{inBasket ? "Added ✓" : "Add to basket"}</button></div></div></article>; })}</div>{basket.length > 0 && <div className="basket-bar"><div><strong>{basket.length} {basket.length === 1 ? "book" : "books"} in your basket</strong><span>Ready for checkout</span></div><button className="primary-button" onClick={() => { setBasket([]); window.alert("Your order has been placed successfully."); }}>Checkout <span>→</span></button></div>}</section>}
 
           {activeNav === "Settings" && <section className="nav-page settings-page"><div className="section-heading"><div><p className="eyebrow">PERSONALISE YOUR SPACE</p><h1>Settings</h1><p className="subtitle">Manage your learning preferences and account experience.</p></div></div><div className="settings-grid"><section className="settings-card"><div className="settings-card-heading"><div><p className="eyebrow">ACCOUNT</p><h2>Profile details</h2></div><span className="settings-avatar">NS</span></div><label>Full name<input defaultValue="Nethmi Silva" /></label><label>Email address<input defaultValue="nethmi.silva@example.com" type="email" /></label><div className="profile-two-col"><label>District<select defaultValue="Colombo"><option>Colombo</option><option>Kandy</option><option>Galle</option><option>Jaffna</option></select></label><label>Language<select value={language} onChange={(event) => { setLanguage(event.target.value); setSettingsSaved(false); }}><option>English</option><option>සිංහල</option><option>தமிழ்</option></select></label></div></section><section className="settings-card"><div className="settings-card-heading"><div><p className="eyebrow">PREFERENCES</p><h2>Learning experience</h2></div></div><label className="setting-toggle"><span><strong>Study reminders</strong><small>Receive notifications about upcoming exams and goals.</small></span><input type="checkbox" checked={notificationsEnabled} onChange={(event) => { setNotificationsEnabled(event.target.checked); setSettingsSaved(false); }} /></label><label className="setting-toggle"><span><strong>Compact layout</strong><small>Fit more learning information on your dashboard.</small></span><input type="checkbox" checked={compactLayout} onChange={(event) => { setCompactLayout(event.target.checked); setSettingsSaved(false); }} /></label><div className="settings-actions"><span>{settingsSaved ? "Settings saved" : "Changes are saved for this session"}</span><button className="primary-button" onClick={() => setSettingsSaved(true)}>Save settings <span>✓</span></button></div></section></div></section>}
         </div>

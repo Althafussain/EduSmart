@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider     = "mongodb"
   relationMode = "prisma"
-  url       = env("DATABASE_URL")
+  url          = env("DATABASE_URL")
 }
 
 enum Role {
@@ -40,44 +40,44 @@ enum EvaluationStatus {
 }
 
 model User {
-  id            String                 @id @default(auto()) @map("_id") @db.ObjectId
-  email         String                 @unique
-  passwordHash  String?
-  fullName      String
-  mobileNumber  String?
-  role          Role                   @default(STUDENT)
+  id             String                 @id @default(auto()) @map("_id") @db.ObjectId
+  email          String                 @unique
+  passwordHash   String?
+  fullName       String
+  mobileNumber   String?
+  role           Role                   @default(STUDENT)
   educationLevel String?
-  stream        String?
-  subjects      Json?
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-  profile       StudentProfile?
-  attempts      ExamAttempt[]
-  learning      LearningHistory[]
-  analytics     PerformanceAnalytics[]
+  stream         String?
+  subjects       Json?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  profile        StudentProfile?
+  attempts       ExamAttempt[]
+  learning       LearningHistory[]
+  analytics      PerformanceAnalytics[]
 }
 
 model StudentProfile {
-  id                String            @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String            @unique @db.ObjectId
+  id                String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String           @unique @db.ObjectId
   district          String
   province          String
   schoolName        String
   educationLevel    EducationLevel
   grade             Int?
   stream            String?
-  preferredLanguage String            @default("English")
-  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferredLanguage String           @default("English")
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   subjects          StudentSubject[]
 }
 
 model Subject {
-  id         String                  @id @default(auto()) @map("_id") @db.ObjectId
-  name       String                  @unique
-  students   StudentSubject[]
-  exams      Exam[]
-  resources  LearningResource[]
-  analytics  PerformanceAnalytics[]
+  id        String                 @id @default(auto()) @map("_id") @db.ObjectId
+  name      String                 @unique
+  students  StudentSubject[]
+  exams     Exam[]
+  resources LearningResource[]
+  analytics PerformanceAnalytics[]
 }
 
 model StudentSubject {
@@ -109,29 +109,29 @@ model Exam {
 }
 
 model Question {
-  id                String           @id @default(auto()) @map("_id") @db.ObjectId
-  examId            String           @db.ObjectId
-  type              QuestionType
-  prompt            String
-  marks             Int
-  options           Json?
-  correctAnswer     String?
-  expectedAnswer    String?
-  markingRubric     Json?
-  exam              Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
-  answers           StudentAnswer[]
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  examId         String          @db.ObjectId
+  type           QuestionType
+  prompt         String
+  marks          Int
+  options        Json?
+  correctAnswer  String?
+  expectedAnswer String?
+  markingRubric  Json?
+  exam           Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
+  answers        StudentAnswer[]
 }
 
 model ExamAttempt {
-  id          String        @id @default(auto()) @map("_id") @db.ObjectId
-  examId      String        @db.ObjectId
-  userId      String        @db.ObjectId
-  status      AttemptStatus @default(IN_PROGRESS)
-  startedAt   DateTime      @default(now())
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  examId      String          @db.ObjectId
+  userId      String          @db.ObjectId
+  status      AttemptStatus   @default(IN_PROGRESS)
+  startedAt   DateTime        @default(now())
   submittedAt DateTime?
   expiresAt   DateTime
-  exam        Exam          @relation(fields: [examId], references: [id])
-  user        User          @relation(fields: [userId], references: [id])
+  exam        Exam            @relation(fields: [examId], references: [id])
+  user        User            @relation(fields: [userId], references: [id])
   answers     StudentAnswer[]
   result      Result?
 
@@ -166,16 +166,45 @@ model Result {
 }
 
 model LearningResource {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  externalId  String   @unique
+  id          String            @id @default(auto()) @map("_id") @db.ObjectId
+  externalId  String            @unique
   title       String
   url         String
   thumbnail   String?
   description String?
-  subjectId   String   @db.ObjectId
+  subjectId   String            @db.ObjectId
   difficulty  String?
-  subject     Subject  @relation(fields: [subjectId], references: [id])
+  subject     Subject           @relation(fields: [subjectId], references: [id])
   history     LearningHistory[]
+}
+
+model Book {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  author      String
+  subject     String
+  level       String
+  price       Int
+  imageUrl    String?
+  coverColor  String   @default("mint")
+  description String?
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Video {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  subject     String
+  level       String
+  duration    String
+  videoUrl    String
+  thumbnail   String?
+  description String?
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model LearningHistory {
@@ -202,4 +231,3 @@ model PerformanceAnalytics {
 
   @@unique([userId, subjectId])
 }
-

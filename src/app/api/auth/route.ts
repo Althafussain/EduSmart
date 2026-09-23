@@ -30,7 +30,6 @@ export async function POST(request: Request) {
       email?: string;
       password?: string;
       fullName?: string;
-      role?: "student" | "admin";
       educationLevel?: string;
       stream?: string;
       subjects?: string[];
@@ -48,10 +47,6 @@ export async function POST(request: Request) {
 
       const email = googleUser.email.toLowerCase();
       let user = await prisma.user.findUnique({ where: { email } });
-      if (user && body.role === "admin" && user.role !== "ADMIN") {
-        return NextResponse.json({ error: "This account is not authorised for the admin portal." }, { status: 403 });
-      }
-
       user ??= await prisma.user.create({
         data: {
           email,
@@ -79,7 +74,7 @@ export async function POST(request: Request) {
           email,
           passwordHash: await hashPassword(password),
           fullName: body.fullName?.trim() || "Student",
-          role: body.role === "admin" ? "ADMIN" : "STUDENT",
+          role: "STUDENT",
           educationLevel: body.educationLevel?.trim() || null,
           stream: body.stream?.trim() || null,
           subjects: Array.isArray(body.subjects) ? body.subjects.filter((subject): subject is string => typeof subject === "string") : [],
@@ -93,10 +88,6 @@ export async function POST(request: Request) {
     if (!user?.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
-    if (body.role === "admin" && user.role !== "ADMIN") {
-      return NextResponse.json({ error: "This account is not authorised for the admin portal." }, { status: 403 });
-    }
-
     await createSession(user.id);
     return NextResponse.json({ user: profileResponse(await getMongoUser()) });
   } catch (error) {
