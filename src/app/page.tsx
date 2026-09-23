@@ -1,7 +1,19 @@
 "use client";
 
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (options: { client_id: string; callback: (response: { credential: string }) => void }) => void;
+          renderButton: (element: HTMLElement, options: { theme: string; size: string; width: number }) => void;
+        };
+      };
+    };
+  }
+}
 
 const recommendedVideos = [
   { title: "Mastering quadratic equations", subject: "Mathematics", level: "O/L • Intermediate", duration: "18 min", color: "#d6e8e1", image: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=900&q=80" },
@@ -110,8 +122,44 @@ function AdminDashboard({ onSignOut }: { onSignOut: () => void }) {
   return <main className="admin-shell"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div><div className="admin-label">ADMIN CONSOLE</div><nav className="admin-nav" aria-label="Admin navigation">{sections.map(([section, label, icon]) => <button key={section} className={activeSection === section ? "active" : ""} onClick={() => setActiveSection(section)}><span>{icon}</span>{label}</button>)}</nav><button className="admin-signout" onClick={onSignOut}>Sign out <span>↗</span></button></aside><section className="admin-content"><header className="admin-topbar"><div><span className="eyebrow">EDUSMART SRI LANKA</span><h1>Content administration</h1></div><div className="admin-identity"><span className="admin-avatar">AD</span><div><strong>EduSmart Admin</strong><small>Full publishing access</small></div></div></header><div className="admin-page-content">{activeSection === "overview" && <><section className="admin-welcome"><div><p className="eyebrow">CONTROL CENTRE</p><h2>Keep the learning library moving.</h2><p>Only administrators can publish exam papers, books, and video lessons for students.</p></div><span className="admin-lock">⌘</span></section><section className="admin-stats"><div><span>LIVE EXAM PAPERS</span><strong>12</strong><small>2 drafts waiting</small></div><div><span>PUBLISHED BOOKS</span><strong>28</strong><small>4 added this month</small></div><div><span>VIDEO LESSONS</span><strong>46</strong><small>6 pending review</small></div></section><div className="admin-section-grid"><button className="admin-action-card" onClick={() => setActiveSection("exams")}><span className="admin-action-icon">▣</span><strong>Manage exam papers</strong><small>Upload papers, set schedules, and publish assessments.</small><span className="admin-action-link">Open manager →</span></button><button className="admin-action-card" onClick={() => setActiveSection("books")}><span className="admin-action-icon">▤</span><strong>Publish books</strong><small>Add trusted revision guides to the student book shop.</small><span className="admin-action-link">Open manager →</span></button><button className="admin-action-card" onClick={() => setActiveSection("videos")}><span className="admin-action-icon">▶</span><strong>Add video lessons</strong><small>Publish curated lessons to student learning spaces.</small><span className="admin-action-link">Open manager →</span></button></div></>}{activeSection === "exams" && <AdminForm title="Exam paper manager" description="Create and publish an assessment. Students can only see papers after you publish them." published={examPublished} onPublish={() => setExamPublished(true)} fields={["Paper title", "Subject", "Start date and time", "Duration"]} />}{activeSection === "books" && <AdminForm title="Book publishing" description="Add a revision guide to the student book shop when its details are ready." published={bookPublished} onPublish={() => setBookPublished(true)} fields={["Book title", "Author or publisher", "Subject", "Price"]} />}{activeSection === "videos" && <AdminForm title="Video lesson manager" description="Add a lesson link and publish it to the student learning library." published={videoPublished} onPublish={() => setVideoPublished(true)} fields={["Video title", "Video URL", "Subject", "Duration"]} />}</div></section></main>;
 }
 
-function ProfileModal({ onClose, onSignOut }: { onClose: () => void; onSignOut: () => void }) {
-  return <div className="modal-backdrop"><section className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title"><div className="profile-modal-head"><div className="profile-hero"><div className="profile-large-avatar">NS</div><div><span className="eyebrow">STUDENT PROFILE</span><h2 id="profile-title">Nethmi Silva</h2><p>Grade 13 · Biological Science</p></div></div><button className="close-button" onClick={onClose} aria-label="Close profile">×</button></div><div className="profile-form"><label>Full name<input defaultValue="Nethmi Silva" /></label><label>Email address<input defaultValue="nethmi.silva@example.com" type="email" /></label><div className="profile-two-col"><label>District<select defaultValue="Colombo"><option>Colombo</option><option>Kandy</option><option>Galle</option><option>Jaffna</option></select></label><label>Province<select defaultValue="Western"><option>Western</option><option>Central</option><option>Southern</option><option>Northern</option></select></label></div><div className="profile-two-col"><label>Education level<select defaultValue="GCE Advanced Level (A/L)"><option>Grade 6–11</option><option>GCE Ordinary Level (O/L)</option><option>GCE Advanced Level (A/L)</option></select></label><label>Preferred language<select defaultValue="English"><option>English</option><option>සිංහල</option><option>தமிழ்</option></select></label></div></div><div className="profile-modal-foot"><button className="signout-button" onClick={onSignOut}>Sign out</button><div><button className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button" onClick={onClose}>Save changes <span>✓</span></button></div></div></section></div>;
+type StudentProfile = {
+  fullName: string;
+  email: string;
+  educationLevel: string;
+  stream: string;
+  subjects: string[];
+};
+
+type AuthResponseUser = {
+  email?: string | null;
+  fullName?: string;
+  educationLevel?: string | null;
+  stream?: string | null;
+  subjects?: string[];
+  role?: string;
+};
+
+function profileFromUser(user: AuthResponseUser | null): StudentProfile {
+  const email = user?.email ?? "";
+  const emailName = email.split("@")[0]?.replace(/[._-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) || "Student";
+
+  return {
+    fullName: user?.fullName?.trim() || emailName,
+    email,
+    educationLevel: user?.educationLevel || "Not provided",
+    stream: user?.stream || "Not provided",
+    subjects: user?.subjects ?? [],
+  };
+}
+
+function getInitials(name: string) {
+  return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "ST";
+}
+
+function ProfileModal({ profile, onClose, onSignOut }: { profile: StudentProfile; onClose: () => void; onSignOut: () => void }) {
+  const academicDetails = [profile.educationLevel, profile.stream !== "Not provided" ? profile.stream : "", profile.subjects.length ? profile.subjects.join(", ") : ""].filter(Boolean).join(" · ");
+
+  return <div className="modal-backdrop"><section className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title"><div className="profile-modal-head"><div className="profile-hero"><div className="profile-large-avatar">{getInitials(profile.fullName)}</div><div><span className="eyebrow">STUDENT PROFILE</span><h2 id="profile-title">{profile.fullName}</h2><p>{academicDetails || "Student account"}</p></div></div><button className="close-button" onClick={onClose} aria-label="Close profile">×</button></div><div className="profile-form"><label>Full name<input value={profile.fullName} readOnly /></label><label>Email address<input value={profile.email} readOnly type="email" /></label><div className="profile-two-col"><label>Education level<input value={profile.educationLevel} readOnly /></label><label>Stream<input value={profile.stream} readOnly /></label></div><label>Subjects<input value={profile.subjects.length ? profile.subjects.join(", ") : "Not provided"} readOnly /></label></div><div className="profile-modal-foot"><button className="signout-button" onClick={onSignOut}>Sign out</button><div><button className="secondary-button" onClick={onClose}>Close</button></div></div></section></div>;
 }
 
 export default function Home() {
@@ -122,6 +170,7 @@ export default function Home() {
   const [authView, setAuthView] = useState<"login" | "signup">("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [profile, setProfile] = useState<StudentProfile>({ fullName: "Student", email: "", educationLevel: "Not provided", stream: "Not provided", subjects: [] });
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authMessage, setAuthMessage] = useState("");
@@ -145,9 +194,7 @@ export default function Home() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(2);
   const [assistantOpen, setAssistantOpen] = useState(false);
-  const [assistantMessages, setAssistantMessages] = useState<{ from: "assistant" | "user"; text: string }[]>([
-    { from: "assistant", text: "Hi Nethmi. I can help with your exams, learning plan, books, or account settings." },
-  ]);
+  const [assistantMessages, setAssistantMessages] = useState<{ from: "assistant" | "user"; text: string }[]>([]);
   const [assistantInput, setAssistantInput] = useState("");
   const text = translations[language as keyof typeof translations];
   const questions = publishedExam?.questions.length ? publishedExam.questions : defaultQuestions;
@@ -156,26 +203,19 @@ export default function Home() {
   const currentPortal = userRole === "admin" ? portal : "student";
   const cycleLanguage = () => setLanguage((current) => languageOptions[(languageOptions.indexOf(current) + 1) % languageOptions.length]);
 
-  const syncUserProfile = async (emailValue: string, fullNameValue: string, nextRole: "student" | "admin") => {
-    const response = await fetch("/api/auth/sync-user", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: emailValue,
-        fullName: fullNameValue,
-        role: nextRole,
-      }),
-    });
-
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      throw new Error(payload.error ?? "Unable to save your account profile.");
-    }
+  const updateProfileFromUser = (user: AuthResponseUser | null) => {
+    const nextProfile = profileFromUser(user);
+    setProfile(nextProfile);
+    setFullName(nextProfile.fullName);
+    setEmail(nextProfile.email);
+    setEducationLevel(nextProfile.educationLevel === "Not provided" ? "" : nextProfile.educationLevel);
+    setStream(nextProfile.stream === "Not provided" ? "" : nextProfile.stream);
+    setSubjects(nextProfile.subjects);
+    setAssistantMessages([{ from: "assistant", text: `Hi ${nextProfile.fullName}. I can help with your exams, learning plan, books, or account settings.` }]);
   };
 
   const handleSignOut = async () => {
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
+    await fetch("/api/auth", { method: "DELETE" });
     setAuthenticated(false);
     setUserRole(null);
     setAuthError("");
@@ -193,66 +233,29 @@ export default function Home() {
       return;
     }
 
-    const supabase = createSupabaseBrowserClient();
     setAuthLoading(true);
 
     try {
       if (authView === "signup") {
         const nextRole = portal === "admin" ? "admin" : "student";
-
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: {
-              full_name: fullName,
-              role: nextRole,
-            },
-          },
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        await syncUserProfile(email, fullName, nextRole);
-
-        if (data.user && !data.session) {
-          setAuthMessage("Account created. Check your email to confirm the registration, then sign in.");
-          setAuthView("login");
-          setPassword("");
-          setFullName("");
-          return;
-        }
-
+        const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "signup", email, password, fullName, role: nextRole, educationLevel, stream, subjects }) });
+        const payload = (await response.json()) as { error?: string; user?: AuthResponseUser };
+        if (!response.ok || !payload.user) throw new Error(payload.error ?? "Unable to create the account.");
         setAuthenticated(true);
         setUserRole(nextRole);
+        updateProfileFromUser(payload.user);
         setAuthMessage("Registration successful. You are now signed in.");
         return;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (error) {
-        throw error;
-      }
-
-      const nextRole = portal === "admin" ? "admin" : "student";
-      const sessionRole = data.user?.user_metadata?.role === "admin" ? "admin" : "student";
-
-      if (portal === "admin" && sessionRole !== "admin") {
-        await supabase.auth.signOut();
-        throw new Error("This account is not authorised for the admin portal.");
-      }
-
-      if (data.session) {
-        const savedName = data.user?.user_metadata?.full_name ?? fullName ?? email;
-        await syncUserProfile(email, savedName, nextRole);
-        setAuthenticated(true);
-        setUserRole(sessionRole);
-        setAuthMessage("Signed in successfully.");
-      }
+      const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "signin", email, password, role: portal }) });
+      const payload = (await response.json()) as { error?: string; user?: AuthResponseUser };
+      if (!response.ok || !payload.user) throw new Error(payload.error ?? "Authentication failed.");
+      const sessionRole = payload.user.role === "admin" ? "admin" : "student";
+      updateProfileFromUser(payload.user);
+      setAuthenticated(true);
+      setUserRole(sessionRole);
+      setAuthMessage("Signed in successfully.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Authentication failed.";
       setAuthError(message);
@@ -261,21 +264,59 @@ export default function Home() {
     }
   };
 
+  const handleGoogleCredential = async (credential: string) => {
+    setAuthError("");
+    setAuthMessage("");
+    setAuthLoading(true);
+    try {
+      const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "google", credential, role: portal }) });
+      const payload = (await response.json()) as { error?: string; user?: AuthResponseUser };
+      if (!response.ok || !payload.user) throw new Error(payload.error ?? "Google sign-in failed.");
+      const sessionRole = payload.user.role === "admin" ? "admin" : "student";
+      updateProfileFromUser(payload.user);
+      setAuthenticated(true);
+      setUserRole(sessionRole);
+      setAuthMessage("Signed in successfully with Google.");
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Google sign-in failed.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const googleCredentialHandler = useRef(handleGoogleCredential);
   useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    supabase.auth.getSession().then(({ data }) => {
-      setAuthenticated(Boolean(data.session));
-    });
+    googleCredentialHandler.current = handleGoogleCredential;
+  });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentRole = session?.user?.user_metadata?.role === "admin" ? "admin" : "student";
-      setAuthenticated(Boolean(session));
-      setUserRole(session ? currentRole : null);
-    });
+  useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const toggle = document.querySelector<HTMLElement>(".auth-toggle");
+    if (authenticated || authView !== "login" || !clientId || !toggle) return;
 
-    return () => {
-      subscription.unsubscribe();
+    const button = document.createElement("div");
+    button.className = "google-signin";
+    toggle.append(button);
+    const renderButton = () => {
+      if (!window.google) return;
+      window.google.accounts.id.initialize({ client_id: clientId, callback: ({ credential }) => googleCredentialHandler.current(credential) });
+      window.google.accounts.id.renderButton(button, { theme: "outline", size: "large", width: 350 });
     };
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.onload = renderButton;
+    document.head.append(script);
+    if (window.google) renderButton();
+    return () => { button.remove(); script.remove(); };
+  }, [authenticated, authView, portal]);
+
+  useEffect(() => {
+    fetch("/api/auth").then((response) => response.json()).then((payload: { user?: AuthResponseUser | null }) => {
+      setAuthenticated(Boolean(payload.user));
+      setUserRole(payload.user?.role === "admin" ? "admin" : payload.user ? "student" : null);
+      if (payload.user) updateProfileFromUser(payload.user);
+    });
   }, []);
 
   useEffect(() => {
@@ -385,15 +426,15 @@ export default function Home() {
         <div className="sidebar-bottom">
           <button className={`nav-item ${activeNav === "Settings" ? "active" : ""}`} onClick={() => setActiveNav("Settings")}><span className="nav-icon">⚙</span>{text.settings}</button>
           <button className="language-switch" onClick={cycleLanguage} aria-label="Change language"><span>◉</span> {language} <span className="chevron">⌄</span></button>
-          <button className="mini-profile" onClick={() => setProfileOpen(true)}><div className="avatar">NS</div><div><strong>Nethmi Silva</strong><span>Grade 13 · Biology</span></div><span className="more">•••</span></button>
+          <button className="mini-profile" onClick={() => setProfileOpen(true)}><div className="avatar">{getInitials(profile.fullName)}</div><div><strong>{profile.fullName}</strong><span>{profile.stream !== "Not provided" ? profile.stream : profile.educationLevel}</span></div><span className="more">•••</span></button>
         </div>
       </aside>
 
       <section className="content-area">
-        <header className="topbar"><div className="mobile-brand">edusmart<span>.</span></div><div className="breadcrumb">Workspace <span>/</span> {activeNav === "Overview" ? text.overview : activeNav === "My learning" ? text.learning : activeNav === "Examinations" ? text.examinations : activeNav === "Progress" ? text.progress : activeNav === "Book shop" ? text.shop : text.settings}</div><div className="top-actions"><div className="notification-wrap"><button className="icon-button" aria-label={text.notifications} aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}>♧{unreadNotifications > 0 && <span className="notification-dot" />}</button>{notificationsOpen && <section className="notification-panel" role="dialog" aria-label={text.notifications}><div className="notification-head"><div><span className="eyebrow">YOUR UPDATES</span><h2>{text.notifications}</h2></div><button className="notification-close" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></div><div className="notification-list"><article className={unreadNotifications > 0 ? "notification-item unread" : "notification-item"}><span className="notification-symbol">◷</span><div><strong>Physics exam reminder</strong><p>Your Unit 04 examination is on 24 Sep at 02:00 PM.</p><small>Today</small></div></article><article className={unreadNotifications > 1 ? "notification-item unread" : "notification-item"}><span className="notification-symbol">✦</span><div><strong>New learning insight</strong><p>You are close to mastering Physics. Keep practising vectors.</p><small>Yesterday</small></div></article></div><button className="mark-read-button" onClick={() => setUnreadNotifications(0)}>{unreadNotifications > 0 ? "Mark all as read" : "All caught up"}</button></section>}</div><button className="top-avatar" onClick={() => setProfileOpen(true)} aria-label="Open profile">NS</button></div></header>
+        <header className="topbar"><div className="mobile-brand">edusmart<span>.</span></div><div className="breadcrumb">Workspace <span>/</span> {activeNav === "Overview" ? text.overview : activeNav === "My learning" ? text.learning : activeNav === "Examinations" ? text.examinations : activeNav === "Progress" ? text.progress : activeNav === "Book shop" ? text.shop : text.settings}</div><div className="top-actions"><div className="notification-wrap"><button className="icon-button" aria-label={text.notifications} aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}>♧{unreadNotifications > 0 && <span className="notification-dot" />}</button>{notificationsOpen && <section className="notification-panel" role="dialog" aria-label={text.notifications}><div className="notification-head"><div><span className="eyebrow">YOUR UPDATES</span><h2>{text.notifications}</h2></div><button className="notification-close" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></div><div className="notification-list"><article className={unreadNotifications > 0 ? "notification-item unread" : "notification-item"}><span className="notification-symbol">◷</span><div><strong>Physics exam reminder</strong><p>Your Unit 04 examination is on 24 Sep at 02:00 PM.</p><small>Today</small></div></article><article className={unreadNotifications > 1 ? "notification-item unread" : "notification-item"}><span className="notification-symbol">✦</span><div><strong>New learning insight</strong><p>You are close to mastering Physics. Keep practising vectors.</p><small>Yesterday</small></div></article></div><button className="mark-read-button" onClick={() => setUnreadNotifications(0)}>{unreadNotifications > 0 ? "Mark all as read" : "All caught up"}</button></section>}</div><button className="top-avatar" onClick={() => setProfileOpen(true)} aria-label="Open profile">{getInitials(profile.fullName)}</button></div></header>
         <div className="page-content">
           {activeNav === "Overview" && <>
-          <section className="welcome-row"><div><p className="eyebrow">THURSDAY, 10 SEPTEMBER 2026</p><h1>Good morning, Nethmi <span>✦</span></h1><p className="subtitle">A little progress every day adds up to big results.</p></div><button className="outline-button" onClick={() => setProfileOpen(true)}>View profile <span>↗</span></button></section>
+          <section className="welcome-row"><div><p className="eyebrow">THURSDAY, 10 SEPTEMBER 2026</p><h1>Good morning, {profile.fullName} <span>✦</span></h1><p className="subtitle">A little progress every day adds up to big results.</p></div><button className="outline-button" onClick={() => setProfileOpen(true)}>View profile <span>↗</span></button></section>
 
           <section className="stats-grid">
             <div className="stat-card accent"><div className="stat-label">LEARNING STREAK <span>↗</span></div><div className="stat-value">12 <small>days</small></div><div className="stat-foot"><span className="sparkline">╱╲╱╲╱╱╲</span> +3 from last week</div></div>
@@ -420,7 +461,7 @@ export default function Home() {
       </section>
 
       {examOpen && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">COMBINED MATHEMATICS · TERM 02</span><h2 id="exam-title">Functions &amp; Graphs</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body"><div className="question-number">0{question + 1}</div><div className="question-content"><h3>{questions[question]}</h3><label><input type="radio" name="answer" checked={answer === "A"} onChange={() => setAnswer("A")} /> <span>A</span> 11</label><label><input type="radio" name="answer" checked={answer === "B"} onChange={() => setAnswer("B")} /> <span>B</span> 8</label><label><input type="radio" name="answer" checked={answer === "C"} onChange={() => setAnswer("C")} /> <span>C</span> 5</label><label><input type="radio" name="answer" checked={answer === "D"} onChange={() => setAnswer("D")} /> <span>D</span> 6</label></div></div><div className="exam-modal-bottom"><span>Answers save automatically</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => { setQuestion(question + 1); setAnswer(""); }}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => setExamOpen(false)}>Submit exam <span>✓</span></button>}</div></div></section></div>}
-      {profileOpen && <ProfileModal onClose={() => setProfileOpen(false)} onSignOut={async () => { setProfileOpen(false); await handleSignOut(); }} />}
+      {profileOpen && <ProfileModal profile={profile} onClose={() => setProfileOpen(false)} onSignOut={async () => { setProfileOpen(false); await handleSignOut(); }} />}
       {authenticated && <div className="assistant-widget"><button className="assistant-launcher" onClick={() => setAssistantOpen((open) => !open)} aria-label={assistantOpen ? "Close EduSmart assistant" : "Open EduSmart assistant"}>{assistantOpen ? "×" : "✦"}<span className="assistant-pulse" /></button>{assistantOpen && <section className="assistant-panel" role="dialog" aria-label="EduSmart support assistant"><div className="assistant-head"><div><span className="assistant-avatar">✦</span><div><strong>EduSmart assistant</strong><small>Here to help</small></div></div><button onClick={() => setAssistantOpen(false)} aria-label="Close assistant">×</button></div><div className="assistant-messages">{assistantMessages.map((message, index) => <p className={`assistant-message ${message.from}`} key={`${message.from}-${index}`}>{message.text}</p>)}</div><div className="assistant-quick-actions"><button onClick={() => askAssistant("exams", "Show my exams")}>My exams</button><button onClick={() => askAssistant("learning", "Help with learning")}>Learning help</button><button onClick={() => askAssistant("books", "Where are the books?")}>Book shop</button></div><form className="assistant-form" onSubmit={submitAssistantMessage}><input value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Ask for support..." aria-label="Ask the assistant" /><button type="submit" aria-label="Send message">↑</button></form></section>}</div>}
     </main>
   );

@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 
-import { getSupabaseUserRole } from "@/lib/supabase/server";
+import { getMongoUser } from "@/lib/auth";
 
 export default async function AdminPage() {
-  const userRole = await getSupabaseUserRole();
+  const user = await getMongoUser();
 
-  if (!userRole || userRole.role !== "admin") {
+  if (!user || user.role !== "admin") {
     redirect("/");
   }
 

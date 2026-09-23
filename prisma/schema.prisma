@@ -3,9 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider     = "mongodb"
+  relationMode = "prisma"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -40,12 +40,15 @@ enum EvaluationStatus {
 }
 
 model User {
-  id            String                 @id @default(cuid())
+  id            String                 @id @default(auto()) @map("_id") @db.ObjectId
   email         String                 @unique
   passwordHash  String?
   fullName      String
   mobileNumber  String?
   role          Role                   @default(STUDENT)
+  educationLevel String?
+  stream        String?
+  subjects      Json?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   profile       StudentProfile?
@@ -55,8 +58,8 @@ model User {
 }
 
 model StudentProfile {
-  id                String            @id @default(cuid())
-  userId            String            @unique
+  id                String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String            @unique @db.ObjectId
   district          String
   province          String
   schoolName        String
@@ -69,7 +72,7 @@ model StudentProfile {
 }
 
 model Subject {
-  id         String                  @id @default(cuid())
+  id         String                  @id @default(auto()) @map("_id") @db.ObjectId
   name       String                  @unique
   students   StudentSubject[]
   exams      Exam[]
@@ -78,16 +81,17 @@ model Subject {
 }
 
 model StudentSubject {
-  studentProfileId String
-  subjectId        String
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  studentProfileId String         @db.ObjectId
+  subjectId        String         @db.ObjectId
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   subject          Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
-  @@id([studentProfileId, subjectId])
+  @@unique([studentProfileId, subjectId])
 }
 
 model Exam {
-  id             String         @id @default(cuid())
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
   title          String
   description    String?
   educationLevel EducationLevel
@@ -98,15 +102,15 @@ model Exam {
   startsAt       DateTime
   endsAt         DateTime
   published      Boolean        @default(false)
-  subjectId      String
+  subjectId      String         @db.ObjectId
   subject        Subject        @relation(fields: [subjectId], references: [id])
   questions      Question[]
   attempts       ExamAttempt[]
 }
 
 model Question {
-  id                String           @id @default(cuid())
-  examId            String
+  id                String           @id @default(auto()) @map("_id") @db.ObjectId
+  examId            String           @db.ObjectId
   type              QuestionType
   prompt            String
   marks             Int
@@ -119,9 +123,9 @@ model Question {
 }
 
 model ExamAttempt {
-  id          String        @id @default(cuid())
-  examId      String
-  userId      String
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  examId      String        @db.ObjectId
+  userId      String        @db.ObjectId
   status      AttemptStatus @default(IN_PROGRESS)
   startedAt   DateTime      @default(now())
   submittedAt DateTime?
@@ -135,9 +139,9 @@ model ExamAttempt {
 }
 
 model StudentAnswer {
-  id               String           @id @default(cuid())
-  attemptId        String
-  questionId       String
+  id               String           @id @default(auto()) @map("_id") @db.ObjectId
+  attemptId        String           @db.ObjectId
+  questionId       String           @db.ObjectId
   answer           String?
   awardedMarks     Float?
   feedback         String?
@@ -150,8 +154,8 @@ model StudentAnswer {
 }
 
 model Result {
-  id                String      @id @default(cuid())
-  attemptId         String      @unique
+  id                String      @id @default(auto()) @map("_id") @db.ObjectId
+  attemptId         String      @unique @db.ObjectId
   obtainedMarks     Float
   percentage        Float
   passed            Boolean
@@ -162,22 +166,22 @@ model Result {
 }
 
 model LearningResource {
-  id          String   @id @default(cuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   externalId  String   @unique
   title       String
   url         String
   thumbnail   String?
   description String?
-  subjectId   String
+  subjectId   String   @db.ObjectId
   difficulty  String?
   subject     Subject  @relation(fields: [subjectId], references: [id])
   history     LearningHistory[]
 }
 
 model LearningHistory {
-  id           String           @id @default(cuid())
-  userId       String
-  resourceId   String
+  id           String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String           @db.ObjectId
+  resourceId   String           @db.ObjectId
   watchedAt    DateTime         @default(now())
   progressSecs Int              @default(0)
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -185,9 +189,9 @@ model LearningHistory {
 }
 
 model PerformanceAnalytics {
-  id           String   @id @default(cuid())
-  userId       String
-  subjectId    String
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  subjectId    String   @db.ObjectId
   averageMarks Float
   strongAreas  Json?
   weakAreas    Json?
