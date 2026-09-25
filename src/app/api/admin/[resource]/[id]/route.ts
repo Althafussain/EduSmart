@@ -9,6 +9,20 @@ async function isAdmin() {
   return (await getMongoUser())?.role === "admin";
 }
 
+type ExamQuestionInput = { prompt: string; options: string[]; correctAnswer: string | null };
+
+function examQuestions(value: unknown): ExamQuestionInput[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => {
+    const question = item as { prompt?: unknown; options?: unknown; correctAnswer?: unknown };
+    return {
+      prompt: String(question.prompt ?? "").trim(),
+      options: Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : [],
+      correctAnswer: question.correctAnswer ? String(question.correctAnswer).trim().toUpperCase() : null,
+    };
+  }).filter((question) => question.prompt && question.options.length >= 2 && (!question.correctAnswer || /^[A-E1-5]$/.test(question.correctAnswer)));
+}
+
 export async function PATCH(request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
   if (!(await isAdmin())) return NextResponse.json({ error: "Administrator access is required." }, { status: 403 });
   const { resource, id } = await context.params;
@@ -37,7 +51,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     if (body.durationMins !== undefined) data.durationMins = Number(body.durationMins);
     if (body.totalMarks !== undefined) data.totalMarks = Number(body.totalMarks);
     delete data.subject;
-    delete data.questions;
+    if (resource === "exams" && body.questions !== undefined) {
+      const questions = examQuestions(body.questions);
+      if (questions.length === 0) return NextResponse.json({ error: "Add at least one complete MCQ with two or more options." }, { status: 400 });
+      data.questions = { deleteMany: {}, create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) };
+    } else {
+      delete data.questions;
+    }
     return NextResponse.json({ item: await prisma.exam.update({ where: { id }, data }) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The item could not be updated.";

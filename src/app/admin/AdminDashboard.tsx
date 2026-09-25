@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 type Resource = "users" | "books" | "videos" | "exams";
 type Item = Record<string, unknown> & { id: string };
+type ExamQuestion = { prompt: string; options: string[]; correctAnswer: string | null };
 
 const labels: Record<Resource, string> = { users: "Users", books: "Books", videos: "Videos", exams: "Exams" };
 const fieldNames: Record<Resource, string[]> = {
@@ -38,6 +39,7 @@ export default function AdminDashboard({ onSignOut }: { onSignOut: () => void })
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [examFile, setExamFile] = useState<File | null>(null);
+  const [examQuestions, setExamQuestions] = useState<ExamQuestion[]>([]);
   const [extractingQuestions, setExtractingQuestions] = useState(false);
 
   async function loadItems(resource: Resource) {
@@ -61,7 +63,7 @@ export default function AdminDashboard({ onSignOut }: { onSignOut: () => void })
   function openCreate() {
     setEditing(null);
     setForm({ role: "STUDENT", published: "false", educationLevel: "A_LEVEL" });
-    setExamFile(null); setStatus(""); setError("");
+    setExamFile(null); setExamQuestions([]); setStatus(""); setError("");
   }
 
   function openEdit(item: Item) {
@@ -71,7 +73,8 @@ export default function AdminDashboard({ onSignOut }: { onSignOut: () => void })
       next[key] = String(value ?? "");
     });
     next.published = String(item.published ?? "false");
-    setEditing(item); setForm(next); setExamFile(null); setStatus(""); setError("");
+    const savedQuestions = Array.isArray(item.questions) ? item.questions as ExamQuestion[] : [];
+    setEditing(item); setForm(next); setExamQuestions(savedQuestions.filter((question) => question && typeof question.prompt === "string")); setExamFile(null); setStatus(""); setError("");
   }
 
   async function extractExamQuestions() {
@@ -85,9 +88,10 @@ export default function AdminDashboard({ onSignOut }: { onSignOut: () => void })
     formData.append("file", examFile);
     try {
       const response = await fetch("/api/admin/exams/upload", { method: "POST", body: formData });
-      const result = await response.json() as { questions?: string[]; fileName?: string; error?: string };
+      const result = await response.json() as { questions?: ExamQuestion[]; fileName?: string; error?: string };
       if (!response.ok || !result.questions) throw new Error(result.error ?? "The PDF could not be read.");
-      setForm((current) => ({ ...current, questions: result.questions?.join("\n") ?? "" }));
+      setExamQuestions(result.questions);
+      setForm((current) => ({ ...current, questions: result.questions?.map((question) => question.prompt).join("\n") ?? "" }));
       setStatus(`${result.questions.length} question${result.questions.length === 1 ? "" : "s"} extracted from ${result.fileName ?? examFile.name}. Review them before saving.`);
     } catch (extractError) {
       setStatus("");
@@ -103,7 +107,10 @@ export default function AdminDashboard({ onSignOut }: { onSignOut: () => void })
     if (active === "books") payload.price = Number(form.price);
     if (active === "exams") {
       payload.durationMins = Number(form.durationMins); payload.totalMarks = Number(form.totalMarks);
-      payload.questions = form.questions?.split("\n").map((question) => question.trim()).filter(Boolean);
+      payload.questions = examQuestions;
+      if (examQuestions.length === 0) {
+        setError("Extract an MCQ paper before saving the exam."); setLoading(false); return;
+      }
     }
     payload.published = form.published === "true";
     if (active === "users") delete payload.published;
@@ -112,7 +119,7 @@ export default function AdminDashboard({ onSignOut }: { onSignOut: () => void })
       const response = await fetch(`/api/admin/${active}${editing ? `/${editing.id}` : ""}`, { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Could not save record.");
-      setStatus(editing ? "Updated in MongoDB." : "Created in MongoDB."); setEditing(null); setForm({}); setExamFile(null); await loadItems(active);
+      setStatus(editing ? "Updated in MongoDB." : "Created in MongoDB."); setEditing(null); setForm({}); setExamFile(null); setExamQuestions([]); await loadItems(active);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save record.");
     } finally { setLoading(false); }
@@ -131,7 +138,7 @@ export default function AdminDashboard({ onSignOut }: { onSignOut: () => void })
     <section className="admin-content"><header className="admin-topbar"><div><span className="eyebrow">EDUSMART SRI LANKA</span><h1>Content administration</h1></div><div className="admin-identity"><span className="admin-avatar">AD</span><div><strong>EduSmart Admin</strong><small>MongoDB-backed management</small></div></div></header>
       <div className="admin-page-content"><div className="admin-page-heading"><div><p className="eyebrow">FULL CRUD ACCESS</p><h2>Manage {labels[active].toLowerCase()}</h2><p>Add, edit, publish, and delete records stored in MongoDB.</p></div><button className="primary-button" onClick={openCreate}>+ Add {labels[active].slice(0, -1)}</button></div>
         {status && <p className="admin-upload-status">{status}</p>}{error && <p className="admin-upload-error">{error}</p>}
-        {(editing || Object.keys(form).length > 0) && <form className="admin-editor admin-crud-form" onSubmit={submit}><div className="admin-editor-fields">{fieldNames[active].map((key) => <label key={key}>{key === "questions" ? "Questions (one per line)" : key === "imageUrl" ? "Book image URL or upload" : key === "videoUrl" ? "Video URL or upload" : key}{key === "questions" || key === "description" ? <textarea rows={key === "questions" ? 5 : 3} value={form[key] ?? ""} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /> : key === "role" ? <select value={form[key] ?? "STUDENT"} onChange={(event) => setForm({ ...form, [key]: event.target.value })}><option>STUDENT</option><option>TEACHER</option><option>ADMIN</option></select> : <><input required={!((editing && key === "password") || key === "thumbnail")} type={key === "password" ? "password" : key.includes("At") ? "datetime-local" : key === "price" || key.includes("Mins") || key === "totalMarks" ? "number" : "text"} value={form[key] ?? ""} onChange={(event) => setForm({ ...form, [key]: event.target.value })} />{(key === "imageUrl" || key === "videoUrl") && <input type="file" accept={key === "imageUrl" ? "image/*" : "video/*"} onChange={(event) => { const file = event.target.files?.[0]; if (file) readMediaFile(file, (value) => setForm((current) => ({ ...current, [key]: value }))); }} />}</>}</label>)}{active === "exams" && <label>Question paper PDF<input type="file" accept=".pdf,application/pdf" onChange={(event) => setExamFile(event.target.files?.[0] ?? null)} /><button type="button" className="secondary-button" onClick={() => void extractExamQuestions()} disabled={!examFile || extractingQuestions}>{extractingQuestions ? "Extracting..." : "Extract questions from PDF"}</button><small>Questions will be extracted and added to the editor for review.</small></label>}{active !== "users" && <label>Published<select value={form.published ?? "false"} onChange={(event) => setForm({ ...form, published: event.target.value })}><option value="false">Draft</option><option value="true">Published</option></select></label>}</div><div className="admin-editor-footer"><span>{status || (editing ? "Update this MongoDB record." : "Create a new MongoDB record.")}</span><div><button type="button" className="secondary-button" onClick={() => { setEditing(null); setForm({}); setExamFile(null); }}>Cancel</button><button type="submit" className="primary-button" disabled={loading || extractingQuestions}>{editing ? "Save changes" : "Create record"}</button></div></div></form>}
+        {(editing || Object.keys(form).length > 0) && <form className="admin-editor admin-crud-form" onSubmit={submit}><div className="admin-editor-fields">{fieldNames[active].map((key) => <label key={key}>{key === "questions" ? "Extracted MCQ prompts" : key === "imageUrl" ? "Book image URL or upload" : key === "videoUrl" ? "Video URL or upload" : key}{key === "questions" || key === "description" ? <textarea rows={key === "questions" ? 5 : 3} readOnly={key === "questions"} value={form[key] ?? ""} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /> : key === "role" ? <select value={form[key] ?? "STUDENT"} onChange={(event) => setForm({ ...form, [key]: event.target.value })}><option>STUDENT</option><option>TEACHER</option><option>ADMIN</option></select> : <><input required={!((editing && key === "password") || key === "thumbnail")} type={key === "password" ? "password" : key.includes("At") ? "datetime-local" : key === "price" || key.includes("Mins") || key === "totalMarks" ? "number" : "text"} value={form[key] ?? ""} onChange={(event) => setForm({ ...form, [key]: event.target.value })} />{(key === "imageUrl" || key === "videoUrl") && <input type="file" accept={key === "imageUrl" ? "image/*" : "video/*"} onChange={(event) => { const file = event.target.files?.[0]; if (file) readMediaFile(file, (value) => setForm((current) => ({ ...current, [key]: value }))); }} />}</>}</label>)}{active === "exams" && <label>Question paper PDF, DOCX, or image<input type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp" onChange={(event) => setExamFile(event.target.files?.[0] ?? null)} /><button type="button" className="secondary-button" onClick={() => void extractExamQuestions()} disabled={!examFile || extractingQuestions}>{extractingQuestions ? "Extracting..." : "Extract MCQ questions"}</button><small>Scanned English, Sinhala, and Tamil papers are supported.</small></label>}{active !== "users" && <label>Published<select value={form.published ?? "false"} onChange={(event) => setForm({ ...form, published: event.target.value })}><option value="false">Draft</option><option value="true">Published</option></select></label>}</div>{active === "exams" && examQuestions.length > 0 && <div className="question-preview"><strong>{examQuestions.length} MCQs ready</strong><ol>{examQuestions.map((question, index) => <li key={`${question.prompt}-${index}`}>{question.prompt}<small>{question.options.map((option, optionIndex) => `${String.fromCharCode(65 + optionIndex)}. ${option}`).join("  ")}{question.correctAnswer ? ` · Answer: ${question.correctAnswer}` : ""}</small></li>)}</ol></div>}<div className="admin-editor-footer"><span>{status || (editing ? "Update this MongoDB record." : "Create a new MongoDB record.")}</span><div><button type="button" className="secondary-button" onClick={() => { setEditing(null); setForm({}); setExamFile(null); setExamQuestions([]); }}>Cancel</button><button type="submit" className="primary-button" disabled={loading || extractingQuestions}>{editing ? "Save changes" : "Create record"}</button></div></div></form>}
         <section className="admin-record-list"><div className="admin-record-list-head"><strong>{items.length} {labels[active].toLowerCase()}</strong><button className="secondary-button" onClick={() => void loadItems(active)}>Refresh</button></div>{loading ? <p className="admin-empty">Loading records...</p> : items.length === 0 ? <p className="admin-empty">No records yet.</p> : items.map((item) => <article className="admin-record" key={item.id}><div><strong>{itemTitle(item, active)}</strong><small>{item.published ? "Published" : "Draft"}</small></div><div className="admin-record-actions"><button onClick={() => openEdit(item)}>Edit</button><button className="danger-button" onClick={() => void remove(item)}>Delete</button></div></article>)}</section>
       </div></section>
   </main>;

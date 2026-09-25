@@ -19,6 +19,25 @@ function errorResponse(error: unknown) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
+type ExamQuestionInput = {
+  prompt: string;
+  options: string[];
+  correctAnswer: string | null;
+};
+
+function examQuestions(value: unknown): ExamQuestionInput[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => {
+    if (typeof item === "string") return { prompt: item.trim(), options: [], correctAnswer: null };
+    const question = item as { prompt?: unknown; options?: unknown; correctAnswer?: unknown };
+    return {
+      prompt: String(question.prompt ?? "").trim(),
+      options: Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : [],
+      correctAnswer: question.correctAnswer ? String(question.correctAnswer).trim().toUpperCase() : null,
+    };
+  }).filter((question) => question.prompt && question.options.length >= 2 && (!question.correctAnswer || /^[A-E1-5]$/.test(question.correctAnswer)));
+}
+
 export async function GET(request: Request, context: { params: Promise<{ resource: string }> }) {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Administrator access is required." }, { status: 403 });
   const resource = resourceName((await context.params).resource);
@@ -49,7 +68,9 @@ export async function POST(request: Request, context: { params: Promise<{ resour
 
     const subjectName = String(body.subject ?? "").trim();
     const subject = await prisma.subject.upsert({ where: { name: subjectName }, update: {}, create: { name: subjectName } });
-    const exam = await prisma.exam.create({ data: { title: String(body.title), description: body.description ? String(body.description) : null, educationLevel: body.educationLevel === "A_LEVEL" || body.educationLevel === "O_LEVEL" ? body.educationLevel : "GRADE", grade: body.grade ? Number(body.grade) : null, stream: body.stream ? String(body.stream) : null, durationMins: Number(body.durationMins), totalMarks: Number(body.totalMarks ?? 0), startsAt: new Date(String(body.startsAt)), endsAt: new Date(String(body.endsAt)), published: Boolean(body.published), subjectId: subject.id, questions: { create: Array.isArray(body.questions) ? body.questions.map((prompt) => ({ type: "SHORT_ANSWER", prompt: String(prompt), marks: 1 })) : [] } }, include: { subject: true, questions: true } });
+    const questions = examQuestions(body.questions);
+    if (questions.length === 0) return NextResponse.json({ error: "Add at least one complete MCQ with two or more options." }, { status: 400 });
+    const exam = await prisma.exam.create({ data: { title: String(body.title), description: body.description ? String(body.description) : null, educationLevel: body.educationLevel === "A_LEVEL" || body.educationLevel === "O_LEVEL" ? body.educationLevel : "GRADE", grade: body.grade ? Number(body.grade) : null, stream: body.stream ? String(body.stream) : null, durationMins: Number(body.durationMins), totalMarks: Number(body.totalMarks ?? questions.length), startsAt: new Date(String(body.startsAt)), endsAt: new Date(String(body.endsAt)), published: Boolean(body.published), subjectId: subject.id, questions: { create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) } }, include: { subject: true, questions: true } });
     return NextResponse.json({ item: exam }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
