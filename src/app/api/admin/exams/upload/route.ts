@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { normalizeOptionAnswer } from "@/lib/exam-answers";
+import path from "node:path";
 import { createCanvas } from "@napi-rs/canvas";
 import JSZip from "jszip";
 import mammoth from "mammoth";
@@ -7,6 +9,7 @@ import { createWorker } from "tesseract.js";
 import { getMongoUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const allowedTypes = new Set([
@@ -17,7 +20,6 @@ const allowedTypes = new Set([
   "image/webp",
 ]);
 const OCR_LANGUAGES = "eng+sin+tam";
-const MAX_OCR_PAGES = 30;
 
 export type ExtractedQuestion = {
   questionNumber: number;
@@ -28,12 +30,20 @@ export type ExtractedQuestion = {
 
 function extractQuestions(text: string): ExtractedQuestion[] {
   const normalizedText = text.replace(/\r/g, "");
-  const answerKeyStart = normalizedText.search(/(?:^|\n)\s*(?:answer\s+key|correct\s+answers?|answers?)\s*:?\s*(?=\n|$)/i);
+  const answerKeyStart = normalizedText.search(/(?:^|\n)\s*(?:answer\s+key|correct\s+answers?|marking\s+scheme)\s*:?\s*(?=\n|$)/i);
   const questionText = answerKeyStart >= 0 ? normalizedText.slice(0, answerKeyStart) : normalizedText;
   const answerKeyText = answerKeyStart >= 0 ? normalizedText.slice(answerKeyStart) : "";
   const normalized = questionText.replace(/[ \t]+/g, " ").trim();
-  const questionStart = /(?:^|\n)\s*(?:(?:question|q)\s*)?(\d{1,3})\s*[.,)\-:]+\s*/gi;
-  const matches = [...normalized.matchAll(questionStart)];
+  // Papers vary between `1.`, `1)`, `(1)`, `Q1`, `Q. 1`, and `Question 1`.
+  // Accept these at line starts so later questions are not swallowed into the
+  // first block when their numbering style differs from the first question.
+  const questionStart = /(?:^|\n)\s*(?:(?:question|q)\.?\s*(?:no\.?\s*)?)?[\[(]?(\d{1,3})[\])]?(?:\s*[.,)\-:]+\s*|\s+(?=[A-Z0-9]))/gim;
+  const lineMatches = [...normalized.matchAll(questionStart)];
+  // Some PDFs flatten numbered questions onto the same line. Compare the
+  // broader pass even when multiple line-start questions were found, otherwise
+  // the parser quietly leaves inline questions inside their predecessor.
+  const inlineMatches = [...normalized.matchAll(/(?:^|\s)(?:(?:question|q)\.?\s*(?:no\.?\s*)?)?[\[(]?(\d{1,3})[\])]?(?:\s*[.,)\-:]+\s*|\s+(?=[A-Z0-9]))/gi)];
+  const matches = inlineMatches.length > lineMatches.length ? inlineMatches : lineMatches;
 
   if (matches.length === 0) return [];
 
@@ -49,37 +59,76 @@ function extractQuestions(text: string): ExtractedQuestion[] {
     const block = normalized.slice(start, end).replace(/\s+/g, " ").trim();
     const answerMatch = block.match(/(?:correct\s+answer|answer|ans)\s*[:\-]?\s*([A-E]|[1-5])\b/i);
     const withoutAnswer = block.replace(/\s*(?:correct\s+answer|answer|ans)\s*[:\-]?\s*(?:[A-E]|[1-5])\b.*$/i, "").trim();
-    const optionMatches = [...withoutAnswer.matchAll(/(?:^|\s)(?:\(([1-5])\)|([A-E]))\s*[.)\-:]?\s*(.*?)(?=\s+(?:\([1-5]\)|[A-E])\s*[.)\-:]?\s+|$)/gi)];
+    let optionMatches = [...withoutAnswer.matchAll(/(?:^|\s)(?:\(([1-5A-E])\)|([A-E1-5])\s*[.)\-:])\s*(.*?)(?=\s+(?:\([1-5A-E]\)|[A-E1-5]\s*[.)\-:])\s+|$)/gi)];
+    if (optionMatches.length < 2) {
+      optionMatches = [...withoutAnswer.matchAll(/(?:^|\s)(?:\(([1-5A-E])\)|([A-E1-5])\s+)\s*(.*?)(?=\s+(?:\([1-5A-E]\)|[A-E1-5])\s+|$)/gi)];
+    }
     const firstOptionIndex = optionMatches[0]?.index;
     const prompt = (firstOptionIndex === undefined ? withoutAnswer : withoutAnswer.slice(0, firstOptionIndex)).trim();
     const options = optionMatches.map((option) => option[3].trim()).filter(Boolean);
 
-    return { questionNumber: Number(questionNumber), prompt, options, correctAnswer: answerMatch?.[1].toUpperCase() ?? answerKey.get(questionNumber) ?? null };
-  }).filter((question) => question.prompt && question.options.length >= 2);
+    return { questionNumber: Number(questionNumber), prompt, options, correctAnswer: normalizeOptionAnswer(answerMatch?.[1] ?? answerKey.get(questionNumber)) };
+  // Keep the question block even if OCR misses one or more option labels. The
+  // admin editor can correct the choices; dropping the block hid later questions.
+  }).filter((question) => question.prompt);
 }
 
 function mergeQuestions(primary: ExtractedQuestion[], secondary: ExtractedQuestion[]) {
-  const byNumber = new Map<number, { primary?: ExtractedQuestion; secondary?: ExtractedQuestion }>();
-  for (const question of primary) byNumber.set(question.questionNumber, { ...byNumber.get(question.questionNumber), primary: question });
-  for (const question of secondary) byNumber.set(question.questionNumber, { ...byNumber.get(question.questionNumber), secondary: question });
+  // Question numbers commonly restart in each section or paper part. Merge the
+  // text and OCR copies only when both the number and prompt identify the same
+  // question; a number-only map silently discarded later questions.
+  const normalize = (value: string) => value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const similarity = (first: string, second: string) => {
+    const a = normalize(first);
+    const b = normalize(second);
+    if (!a || !b) return 0;
+    if (a === b || a.startsWith(b) || b.startsWith(a)) return 1;
+    const firstWords = new Set(a.split(/\s+/).filter((word) => word.length > 2));
+    const secondWords = new Set(b.split(/\s+/).filter((word) => word.length > 2));
+    const shared = [...firstWords].filter((word) => secondWords.has(word)).length;
+    return shared / Math.max(firstWords.size, secondWords.size, 1);
+  };
 
-  return [...byNumber.entries()].sort(([firstNumber], [secondNumber]) => firstNumber - secondNumber).map(([questionNumber, pair]) => {
-    const first = pair.primary;
-    const second = pair.secondary;
-    if (!first) return second;
-    if (!second) return first;
-    return {
-      questionNumber,
-      prompt: first.prompt.length >= second.prompt.length ? first.prompt : second.prompt,
-      options: first.options.length >= second.options.length ? first.options : second.options,
-      correctAnswer: first.correctAnswer ?? second.correctAnswer,
+  const merged = primary.map((question) => ({ ...question }));
+  for (const scanned of secondary) {
+    const matchIndex = merged.findIndex((question) =>
+      question.questionNumber === scanned.questionNumber && similarity(question.prompt, scanned.prompt) >= 0.55,
+    );
+    if (matchIndex < 0) {
+      merged.push({ ...scanned });
+      continue;
+    }
+
+    const existing = merged[matchIndex];
+    merged[matchIndex] = {
+      ...existing,
+      prompt: scanned.prompt.length > existing.prompt.length ? scanned.prompt : existing.prompt,
+      options: scanned.options.join(" ").length > existing.options.join(" ").length ? scanned.options : existing.options,
+      correctAnswer: existing.correctAnswer ?? scanned.correctAnswer,
     };
-  }).filter((question): question is ExtractedQuestion => Boolean(question && question.prompt && question.options.length >= 2));
+  }
+
+  return merged.filter((question) => question.prompt);
+}
+
+async function createOcrWorker() {
+  const worker = await createWorker(OCR_LANGUAGES, 1, {
+    langPath: process.cwd(),
+    cachePath: path.join(process.cwd(), ".tesseract-cache"),
+    gzip: false,
+  });
+  try {
+    await worker.setParameters({ preserve_interword_spaces: "1" });
+    return worker;
+  } catch (error) {
+    await worker.terminate();
+    throw error;
+  }
 }
 
 async function recognizeImages(images: Buffer[]) {
   if (images.length === 0) return "";
-  const worker = await createWorker(OCR_LANGUAGES);
+  const worker = await createOcrWorker();
   try {
     const results: string[] = [];
     for (const image of images) {
@@ -95,20 +144,37 @@ async function recognizeImages(images: Buffer[]) {
 async function recognizePdf(buffer: Buffer) {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const document = await pdfjs.getDocument({ data: new Uint8Array(buffer), useSystemFonts: true }).promise;
-  const images: Buffer[] = [];
+  let worker: Awaited<ReturnType<typeof createOcrWorker>> | undefined;
   try {
-    for (let pageNumber = 1; pageNumber <= Math.min(document.numPages, MAX_OCR_PAGES); pageNumber += 1) {
-      const page = await document.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 1.6 });
-      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
-      await page.render({ canvas: canvas as unknown as HTMLCanvasElement, canvasContext: canvas.getContext("2d") as unknown as CanvasRenderingContext2D, viewport }).promise;
-      images.push(canvas.toBuffer("image/png"));
-      page.cleanup();
+    worker = await createOcrWorker();
+    const results: string[] = [];
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      let page: Awaited<ReturnType<typeof document.getPage>> | undefined;
+      try {
+        page = await document.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+        try {
+          await page.render({ canvas: canvas as unknown as HTMLCanvasElement, canvasContext: canvas.getContext("2d") as unknown as CanvasRenderingContext2D, viewport }).promise;
+          const image = canvas.toBuffer("image/png");
+          const result = await worker.recognize(image);
+          results.push(result.data.text);
+        } finally {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+      } catch (error) {
+        console.error(`PDF OCR failed on page ${pageNumber} of ${document.numPages}:`, error);
+        throw new Error(`Could not scan PDF page ${pageNumber} of ${document.numPages}. The document scan was stopped before completion.`);
+      } finally {
+        page?.cleanup();
+      }
     }
+    return { text: results.join("\n"), pagesScanned: document.numPages };
   } finally {
+    if (worker) await worker.terminate();
     await document.cleanup();
   }
-  return recognizeImages(images);
 }
 
 async function extractPdfText(buffer: Buffer) {
@@ -119,7 +185,20 @@ async function extractPdfText(buffer: Buffer) {
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
       const content = await page.getTextContent();
-      pages.push(content.items.map((item) => "str" in item ? item.str : "").join(" "));
+      const lines: { y: number; items: { x: number; text: string }[] }[] = [];
+      for (const item of content.items) {
+        if (!("str" in item) || !("transform" in item) || !Array.isArray(item.transform)) continue;
+        const y = Math.round(Number(item.transform[5] ?? 0));
+        const x = Number(item.transform[4] ?? 0);
+        const line = lines.find((candidate) => Math.abs(candidate.y - y) <= 4);
+        if (line) line.items.push({ x, text: item.str });
+        else lines.push({ y, items: [{ x, text: item.str }] });
+      }
+      pages.push(lines
+        .sort((first, second) => second.y - first.y)
+        .map(({ items }) => items.sort((first, second) => first.x - second.x).map((item) => item.text).join(" ").trim())
+        .filter(Boolean)
+        .join("\n"));
       page.cleanup();
     }
     return pages.join("\n");
@@ -130,11 +209,23 @@ async function extractPdfText(buffer: Buffer) {
 
 async function recognizeDocxImages(buffer: Buffer) {
   const archive = await JSZip.loadAsync(buffer);
-  const images = await Promise.all(Object.values(archive.files)
+  const imageFiles = Object.values(archive.files)
     .filter((entry) => !entry.dir && entry.name.startsWith("word/media/"))
-    .slice(0, MAX_OCR_PAGES)
-    .map((entry) => entry.async("nodebuffer")));
-  return recognizeImages(images);
+    .sort((first, second) => first.name.localeCompare(second.name, undefined, { numeric: true }));
+  if (imageFiles.length === 0) return { text: "", imagesScanned: 0 };
+
+  const worker = await createOcrWorker();
+  try {
+    const results: string[] = [];
+    for (const imageFile of imageFiles) {
+      const image = await imageFile.async("nodebuffer");
+      const result = await worker.recognize(image);
+      results.push(result.data.text);
+    }
+    return { text: results.join("\n"), imagesScanned: imageFiles.length };
+  } finally {
+    await worker.terminate();
+  }
 }
 
 export async function POST(request: Request) {
@@ -166,6 +257,8 @@ export async function POST(request: Request) {
   const buffer = Buffer.from(await file.arrayBuffer());
   let text = "";
   let ocrText = "";
+  let pagesScanned: number | null = null;
+  let imagesScanned: number | null = null;
 
   try {
     if (file.name.toLowerCase().endsWith(".pdf")) {
@@ -174,7 +267,9 @@ export async function POST(request: Request) {
       } catch {
         text = "";
       }
-      ocrText = await recognizePdf(buffer);
+      const scan = await recognizePdf(buffer);
+      ocrText = scan.text;
+      pagesScanned = scan.pagesScanned;
     } else if (file.name.toLowerCase().endsWith(".docx")) {
       try {
         const result = await mammoth.extractRawText({ buffer });
@@ -182,22 +277,36 @@ export async function POST(request: Request) {
       } catch {
         text = "";
       }
-      ocrText = await recognizeDocxImages(buffer);
+      const scan = await recognizeDocxImages(buffer);
+      ocrText = scan.text;
+      imagesScanned = scan.imagesScanned;
     } else {
       ocrText = await recognizeImages([buffer]);
+      imagesScanned = 1;
     }
   } catch (error) {
     console.error("Exam document processing failed:", error);
-    return NextResponse.json({ error: "The file could not be read or OCR could not process it. Check that it is a valid PDF, DOCX, PNG, JPG, or WEBP file and try again." }, { status: 422 });
+    const message = error instanceof Error ? error.message : "";
+    const errorMessage = message.startsWith("Could not scan PDF page ")
+      ? message
+      : "The file could not be read or OCR could not process it. Check that it is a valid PDF, DOCX, PNG, JPG, or WEBP file and try again.";
+    return NextResponse.json({ error: errorMessage }, { status: 422 });
   }
 
   const questions = mergeQuestions(extractQuestions(text), extractQuestions(ocrText));
   if (questions.length === 0) {
-    return NextResponse.json({ error: "No complete MCQ questions with at least two options were found. The document was scanned, so OCR ran, but the question or A-D option layout was not recognized." }, { status: 422 });
+    const scanned = pagesScanned !== null
+      ? `All ${pagesScanned} PDF pages were scanned. `
+      : imagesScanned !== null
+        ? `${imagesScanned} document images were scanned. `
+        : "The document text was read. ";
+    return NextResponse.json({ error: `${scanned}No numbered question blocks were recognized. Check that the paper has readable question numbers or labels such as Question 1 or Q1.` }, { status: 422 });
   }
 
   return NextResponse.json({
     fileName: file.name,
+    pagesScanned,
+    imagesScanned,
     extractedText: text.trim(),
     questions: questions.map(({ prompt, options, correctAnswer }) => ({ prompt, options, correctAnswer })),
   });

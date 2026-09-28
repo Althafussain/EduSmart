@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getMongoUser } from "@/lib/auth";
+import { resolveOptionAnswer } from "@/lib/exam-answers";
 import { prisma } from "@/lib/prisma";
 
 type Resource = "users" | "books" | "videos" | "exams";
@@ -33,9 +34,9 @@ function examQuestions(value: unknown): ExamQuestionInput[] {
     return {
       prompt: String(question.prompt ?? "").trim(),
       options: Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : [],
-      correctAnswer: question.correctAnswer ? String(question.correctAnswer).trim().toUpperCase() : null,
+      correctAnswer: resolveOptionAnswer(question.correctAnswer, Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : []),
     };
-  }).filter((question) => question.prompt && question.options.length >= 2 && (!question.correctAnswer || /^[A-E1-5]$/.test(question.correctAnswer)));
+  });
 }
 
 export async function GET(request: Request, context: { params: Promise<{ resource: string }> }) {
@@ -69,8 +70,10 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     const subjectName = String(body.subject ?? "").trim();
     const subject = await prisma.subject.upsert({ where: { name: subjectName }, update: {}, create: { name: subjectName } });
     const questions = examQuestions(body.questions);
-    if (questions.length === 0) return NextResponse.json({ error: "Add at least one complete MCQ with two or more options." }, { status: 400 });
-    const exam = await prisma.exam.create({ data: { title: String(body.title), description: body.description ? String(body.description) : null, educationLevel: body.educationLevel === "A_LEVEL" || body.educationLevel === "O_LEVEL" ? body.educationLevel : "GRADE", grade: body.grade ? Number(body.grade) : null, stream: body.stream ? String(body.stream) : null, durationMins: Number(body.durationMins), totalMarks: Number(body.totalMarks ?? questions.length), startsAt: new Date(String(body.startsAt)), endsAt: new Date(String(body.endsAt)), published: Boolean(body.published), subjectId: subject.id, questions: { create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) } }, include: { subject: true, questions: true } });
+    if (questions.length === 0 || questions.some((question) => !question.prompt || question.options.length < 2 || !question.correctAnswer)) {
+      return NextResponse.json({ error: "Every exam question must have a prompt, at least two options, and a correct answer that matches one of those options." }, { status: 400 });
+    }
+    const exam = await prisma.exam.create({ data: { title: String(body.title), description: body.description ? String(body.description) : null, educationLevel: body.educationLevel === "A_LEVEL" || body.educationLevel === "O_LEVEL" ? body.educationLevel : "GRADE", grade: body.grade ? Number(body.grade) : null, stream: body.stream ? String(body.stream) : null, durationMins: Number(body.durationMins), totalMarks: questions.length, startsAt: new Date(String(body.startsAt)), endsAt: new Date(String(body.endsAt)), published: Boolean(body.published), subjectId: subject.id, questions: { create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) } }, include: { subject: true, questions: true } });
     return NextResponse.json({ item: exam }, { status: 201 });
   } catch (error) {
     return errorResponse(error);

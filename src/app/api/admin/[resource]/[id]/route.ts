@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getMongoUser } from "@/lib/auth";
+import { resolveOptionAnswer } from "@/lib/exam-answers";
 import { prisma } from "@/lib/prisma";
 
 const resources = new Set(["users", "books", "videos", "exams"]);
@@ -18,9 +19,9 @@ function examQuestions(value: unknown): ExamQuestionInput[] {
     return {
       prompt: String(question.prompt ?? "").trim(),
       options: Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : [],
-      correctAnswer: question.correctAnswer ? String(question.correctAnswer).trim().toUpperCase() : null,
+      correctAnswer: resolveOptionAnswer(question.correctAnswer, Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : []),
     };
-  }).filter((question) => question.prompt && question.options.length >= 2 && (!question.correctAnswer || /^[A-E1-5]$/.test(question.correctAnswer)));
+  });
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
@@ -49,11 +50,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     if (body.startsAt) data.startsAt = new Date(String(body.startsAt));
     if (body.endsAt) data.endsAt = new Date(String(body.endsAt));
     if (body.durationMins !== undefined) data.durationMins = Number(body.durationMins);
-    if (body.totalMarks !== undefined) data.totalMarks = Number(body.totalMarks);
     delete data.subject;
+    delete data.totalMarks;
     if (resource === "exams" && body.questions !== undefined) {
       const questions = examQuestions(body.questions);
-      if (questions.length === 0) return NextResponse.json({ error: "Add at least one complete MCQ with two or more options." }, { status: 400 });
+      if (questions.length === 0 || questions.some((question) => !question.prompt || question.options.length < 2 || !question.correctAnswer)) {
+        return NextResponse.json({ error: "Every exam question must have a prompt, at least two options, and a correct answer that matches one of those options." }, { status: 400 });
+      }
+      data.totalMarks = questions.length;
       data.questions = { deleteMany: {}, create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) };
     } else {
       delete data.questions;
@@ -80,7 +84,13 @@ export async function DELETE(request: Request, context: { params: Promise<{ reso
       await prisma.user.delete({ where: { id } });
     } else if (resource === "books") await prisma.book.delete({ where: { id } });
     else if (resource === "videos") await prisma.video.delete({ where: { id } });
-    else await prisma.exam.delete({ where: { id } });
+    else {
+      const questions = await prisma.question.findMany({ where: { examId: id }, select: { id: true } });
+      const questionIds = questions.map((question) => question.id);
+      if (questionIds.length > 0) await prisma.studentAnswer.deleteMany({ where: { questionId: { in: questionIds } } });
+      await prisma.examAttempt.deleteMany({ where: { examId: id } });
+      await prisma.exam.delete({ where: { id } });
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The item could not be deleted.";

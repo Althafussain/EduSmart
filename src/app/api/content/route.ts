@@ -8,7 +8,7 @@ export async function GET() {
   const [books, videos, exams] = await Promise.all([
     prisma.book.findMany({ where: { published: true }, orderBy: { createdAt: "desc" } }),
     prisma.video.findMany({ where: { published: true }, orderBy: { createdAt: "desc" } }),
-    prisma.exam.findMany({ where: { published: true }, orderBy: { startsAt: "asc" }, include: { subject: true, questions: { orderBy: { id: "asc" } } } }),
+    prisma.exam.findMany({ where: { published: true }, orderBy: { startsAt: "asc" }, include: { subject: true, questions: { orderBy: { id: "asc" }, select: { id: true, prompt: true, options: true, marks: true, type: true } } } }),
   ]);
 
   return NextResponse.json({ books, videos, exams });

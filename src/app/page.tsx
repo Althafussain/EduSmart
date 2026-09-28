@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import ExamQuestionEditor from "./admin/ExamQuestionEditor";
 
 declare global {
   interface Window {
@@ -27,6 +28,7 @@ const streamSubjects: Record<string, string[]> = {
 };
 
 type BookCard = { id: string; title: string; author: string; subject: string; level: string; price: string; color: string; imageUrl: string };
+type ExtractedExamQuestion = { prompt: string; options: string[]; correctAnswer: string | null };
 
 const assistantReplies: Record<string, string> = {
   exams: "You have two upcoming examinations. Combined Mathematics is on 18 Sep at 09:00 AM, followed by Physics on 24 Sep at 02:00 PM.",
@@ -45,7 +47,8 @@ const pageTranslationRows = [
   ["LEARNING, IN MOTION", "ඉගෙනීම, චලනයේ", "கற்றல், இயக்கத்தில்"], ["Your next breakthrough starts here.", "ඔබේ ඊළඟ ජයග්‍රහණය මෙතැනින් ආරම්භ වේ.", "உங்கள் அடுத்த முன்னேற்றம் இங்கே தொடங்குகிறது."], ["One focused space for Sri Lankan students to learn with purpose, practise with confidence, and see their progress clearly.", "ශ්‍රී ලාංකික සිසුන්ට අරමුණකින් ඉගෙනීමට, විශ්වාසයෙන් පුහුණු වීමට සහ ප්‍රගතිය පැහැදිලිව දැකීමට එක් ස්ථානයක්.", "இலங்கை மாணவர்கள் நோக்கத்துடன் கற்கவும், நம்பிக்கையுடன் பயிற்சி செய்யவும், முன்னேற்றத்தைத் தெளிவாகக் காணவும் ஒரே இடம்."], ["Built around your goals", "ඔබේ ඉලක්ක වටා ගොඩනගා ඇත", "உங்கள் இலக்குகளைச் சுற்றி உருவாக்கப்பட்டது"], ["Personalised learning paths for every subject, stream, and stage.", "සෑම විෂයකටම, ධාරාවකටම සහ අදියරකටම පුද්ගලීකරණය කළ ඉගෙනුම් මාර්ග.", "ஒவ்வொரு பாடம், பிரிவு மற்றும் நிலையிற்கும் தனிப்பயன் கற்றல் பாதைகள்."], ["STUDENT SPACE", "ශිෂ්‍ය අවකාශය", "மாணவர் இடம்"], ["WELCOME BACK", "නැවත සාදරයෙන් පිළිගනිමු", "மீண்டும் வரவேற்கிறோம்"], ["Sign in as student", "ශිෂ්‍යයෙකු ලෙස ඇතුළු වන්න", "மாணவராக உள்நுழைக"], ["Create an account", "ගිණුමක් සාදන්න", "கணக்கை உருவாக்கு"], ["Forgot password?", "මුරපදය අමතකද?", "கடவுச்சொல்லை மறந்துவிட்டீர்களா?"], ["Good morning, Nethmi", "සුභ උදෑසනක්, නෙත්මි", "காலை வணக்கம், நேத்மி"], ["Keep learning", "ඉගෙනීම දිගටම කරගෙන යන්න", "தொடர்ந்து கற்றுக்கொள்ளுங்கள்"], ["Upcoming examinations", "ඉදිරි විභාග", "வரவிருக்கும் பரீட்சைகள்"], ["Subject strengths", "විෂය ශක්තීන්", "பாட வலிமைகள்"], ["See all recommendations", "සියලු නිර්දේශ බලන්න", "அனைத்து பரிந்துரைகளையும் காண்க"], ["View calendar", "දින දර්ශනය බලන්න", "நாட்காட்டியைக் காண்க"], ["Stay on track", "මාර්ගයේ රැඳී සිටින්න", "பாதையில் தொடருங்கள்"], ["YOUR PROGRESS", "ඔබේ ප්‍රගතිය", "உங்கள் முன்னேற்றம்"], ["Book shop", "පොත් සාප්පුව", "புத்தகக் கடை"], ["Get trusted revision guides and practice papers delivered to you.", "විශ්වාසදායක පුනරීක්ෂණ මාර්ගෝපදේශ සහ පුහුණු ප්‍රශ්න පත්‍ර ලබා ගන්න.", "நம்பகமான மீளாய்வு வழிகாட்டிகள் மற்றும் பயிற்சி வினாத்தாள்களைப் பெறுங்கள்."], ["Add to basket", "බාස්කට්ටුවට එක් කරන්න", "கூடையில் சேர்"], ["Checkout", "ගෙවීම", "செலுத்துதல்"], ["Settings", "සැකසුම්", "அமைப்புகள்"], ["Profile details", "පැතිකඩ විස්තර", "சுயவிவர விவரங்கள்"], ["Learning experience", "ඉගෙනුම් අත්දැකීම", "கற்றல் அனுபவம்"], ["Study reminders", "අධ්‍යයන මතක් කිරීම්", "படிப்பு நினைவூட்டல்கள்"], ["Compact layout", "සංක්ෂිප්ත පිරිසැලසුම", "சுருக்கமான அமைப்பு"], ["Save settings", "සැකසුම් සුරකින්න", "அமைப்புகளைச் சேமி"], ["Notifications", "දැනුම්දීම්", "அறிவிப்புகள்"], ["Mark all as read", "සියල්ල කියවූ ලෙස සලකුණු කරන්න", "அனைத்தையும் படித்ததாகக் குறிக்கவும்"], ["All caught up", "සියල්ල යාවත්කාලීනයි", "அனைத்தும் படிக்கப்பட்டது"], ["Here to help", "උදව් කිරීමට සූදානම්", "உதவ தயாராக உள்ளது"], ["Ask for support...", "සහාය සඳහා විමසන්න...", "ஆதரவைக் கேளுங்கள்..."], ["My exams", "මගේ විභාග", "என் பரீட்சைகள்"], ["Learning help", "ඉගෙනුම් උදව්", "கற்றல் உதவி"], ["Where are the books?", "පොත් කොහේද?", "புத்தகங்கள் எங்கே?"], ["Send message", "පණිවිඩය යවන්න", "செய்தியை அனுப்பு"] ,
 ] as const;
 
-type ExamQuestion = { prompt: string; options: string[]; correctAnswer: string | null };
+type ExamQuestion = { id: string; prompt: string; options: string[]; marks: number; type: string };
+type ExamResult = { obtainedMarks: number; totalMarks: number; percentage: number; passed: boolean };
 type PublishedExam = { id: string; title: string; subject: string; date: string; time: string; duration: string; tone: string; questions: ExamQuestion[]; fileName: string };
 
 function VideoPlayerModal({ video, onClose }: { video: VideoCard; onClose: () => void }) {
@@ -58,27 +61,31 @@ function ExamUploadForm() {
   const [subject, setSubject] = useState("");
   const [date, setDate] = useState("");
   const [duration, setDuration] = useState("60 min");
-  const [questions, setQuestions] = useState<string[]>([]);
+  const [questions, setQuestions] = useState<ExtractedExamQuestion[]>([]);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
 
+  const addManualQuestion = () => setQuestions((current) => [...current, { prompt: "", options: ["", ""], correctAnswer: null }]);
+
   const extractQuestions = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!file) { setError("Choose a PDF or DOCX exam paper first."); return; }
-    setUploading(true); setError(""); setStatus("Extracting question text...");
+    setUploading(true); setError(""); setStatus("Scanning every page for questions and answer keys...");
     const formData = new FormData(); formData.append("file", file);
     try {
       const response = await fetch("/api/admin/exams/upload", { method: "POST", body: formData });
-      const result = await response.json() as { questions?: string[]; error?: string; fileName?: string };
+      const result = await response.json() as { questions?: ExtractedExamQuestion[]; error?: string; fileName?: string; pagesScanned?: number | null; imagesScanned?: number | null };
       if (!response.ok || !result.questions) throw new Error(result.error ?? "The file could not be read.");
-      setQuestions(result.questions); setStatus(`${result.questions.length} question${result.questions.length === 1 ? "" : "s"} extracted from ${result.fileName}.`);
+      const scanSummary = result.pagesScanned ? `All ${result.pagesScanned} PDF pages scanned. ` : result.imagesScanned ? `${result.imagesScanned} document image${result.imagesScanned === 1 ? "" : "s"} scanned. ` : "";
+      setQuestions(result.questions); setStatus(`${scanSummary}${result.questions.length} questions extracted from ${result.fileName}. Review the options and fill in any missing choices or answers before publishing.`);
     } catch (uploadError) { setStatus(""); setError(uploadError instanceof Error ? uploadError.message : "The upload failed."); }
     finally { setUploading(false); }
   };
 
   const publishExam = async () => {
-    if (!title || !subject || !date || questions.length === 0) { setError("Add the exam details and extract the questions before publishing."); return; }
+    const incompleteQuestion = questions.some((question) => { const options = question.options.map((option) => option.trim()); const firstEmpty = options.indexOf(""); return !question.prompt.trim() || options.filter(Boolean).length < 2 || (firstEmpty >= 0 && options.slice(firstEmpty).some(Boolean)) || !question.correctAnswer || !options[question.correctAnswer.charCodeAt(0) - 65]; });
+    if (!title || !subject || !date || questions.length === 0 || incompleteQuestion) { setError("Add the exam details and complete every question with at least two consecutive options and a correct answer before publishing."); return; }
     setUploading(true); setError("");
     try {
       const startsAt = `${date}T09:00:00`;
@@ -90,7 +97,7 @@ function ExamUploadForm() {
     finally { setUploading(false); }
   };
 
-  return <section className="admin-form-page"><div className="admin-page-heading"><div><p className="eyebrow">ADMIN ONLY · PDF / DOCX EXTRACTION</p><h2>Exam paper manager</h2><p>Upload a paper, review the extracted questions, then publish it to students.</p></div><span className={status.includes("Published") ? "publish-status live" : "publish-status"}>{status.includes("Published") ? "Published" : "Draft"}</span></div><form className="admin-editor" onSubmit={extractQuestions}><div className="admin-editor-fields"><label>Paper title<input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Term 03 Biology Paper" /></label><label>Subject<input required value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="e.g. Biology" /></label><label>Exam date<input required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>Duration<select value={duration} onChange={(event) => setDuration(event.target.value)}><option>60 min</option><option>90 min</option><option>120 min</option><option>180 min</option></select></label><label className="admin-upload-field">Exam paper file<input required type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><small>PDF or DOCX, maximum 10 MB. Text-based files work best.</small></label></div>{error && <p className="admin-upload-error">{error}</p>}{status && !status.includes("Published") && <p className="admin-upload-status">{status}</p>}{questions.length > 0 && <div className="question-preview"><div><span className="eyebrow">EXTRACTED QUESTIONS</span><strong>{questions.length} ready for review</strong></div><ol>{questions.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ol></div>}<div className="admin-editor-footer"><span>{questions.length > 0 ? "Review the extracted text before publishing." : "Questions remain private until you publish this paper."}</span><div><button type="submit" className="secondary-button" disabled={uploading}>{uploading ? "Reading file..." : "Extract questions"}</button><button type="button" className="primary-button" disabled={questions.length === 0} onClick={publishExam}>Publish to students →</button></div></div></form></section>;
+  return <section className="admin-form-page"><div className="admin-page-heading"><div><p className="eyebrow">ADMIN ONLY · PDF / DOCX EXTRACTION</p><h2>Exam paper manager</h2><p>Upload a paper, review the extracted questions, then publish it to students.</p></div><span className={status.includes("Published") ? "publish-status live" : "publish-status"}>{status.includes("Published") ? "Published" : "Draft"}</span></div><form className="admin-editor" onSubmit={extractQuestions}><div className="admin-editor-fields"><label>Paper title<input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Term 03 Biology Paper" /></label><label>Subject<input required value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="e.g. Biology" /></label><label>Exam date<input required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>Duration<select value={duration} onChange={(event) => setDuration(event.target.value)}><option>60 min</option><option>90 min</option><option>120 min</option><option>180 min</option></select></label><label className="admin-upload-field">Exam paper file<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><small>Optional when entering questions manually. Every PDF page is scanned. Text-based files work best.</small></label></div>{error && <p className="admin-upload-error">{error}</p>}{status && !status.includes("Published") && <p className="admin-upload-status">{status}</p>}<ExamQuestionEditor questions={questions} onChange={setQuestions} onAdd={addManualQuestion} /><div className="admin-editor-footer"><span>{questions.length > 0 ? "Review the extracted questions and answers before publishing." : "Questions remain private until you publish this paper."}</span><div><button type="submit" className="secondary-button" disabled={uploading}>{uploading ? "Reading file..." : "Extract questions"}</button><button type="button" className="primary-button" disabled={questions.length === 0} onClick={publishExam}>Publish to students →</button></div></div></form></section>;
 }
 
 function AdminForm({ title, description, fields, published, onPublish }: { title: string; description: string; fields: string[]; published: boolean; onPublish: () => void }) {
@@ -171,7 +178,9 @@ export default function Home() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [question, setQuestion] = useState(0);
   const [seconds, setSeconds] = useState(42 * 60 + 18);
-  const [answer, setAnswer] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [examResult, setExamResult] = useState<ExamResult | null>(null);
+  const [examError, setExamError] = useState("");
   const [educationLevel, setEducationLevel] = useState("");
   const [stream, setStream] = useState("");
   const [subjects, setSubjects] = useState<string[]>([]);
@@ -193,6 +202,20 @@ export default function Home() {
   const languageOptions = ["English", "සිංහල", "தமிழ்"];
   const currentPortal = userRole === "admin" ? "admin" : "student";
   const cycleLanguage = () => setLanguage((current) => languageOptions[(languageOptions.indexOf(current) + 1) % languageOptions.length]);
+
+  const submitExam = async () => {
+    if (!activeExam) return;
+    setExamError("");
+    try {
+      const response = await fetch(`/api/exams/${activeExam.id}/submit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers: Object.entries(answers).map(([questionId, selectedAnswer]) => ({ questionId, answer: selectedAnswer })) }) });
+      const payload = await response.json() as ExamResult & { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "The exam could not be submitted.");
+      setExamResult(payload);
+      setExamOpen(false);
+    } catch (submitError) {
+      setExamError(submitError instanceof Error ? submitError.message : "The exam could not be submitted.");
+    }
+  };
 
   const updateProfileFromUser = (user: AuthResponseUser | null) => {
     const nextProfile = profileFromUser(user);
@@ -453,7 +476,8 @@ export default function Home() {
         </div>
       </section>
 
-      {examOpen && activeExam && questions[question] && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">{activeExam.subject}</span><h2 id="exam-title">{activeExam.title}</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body"><div className="question-number">{String(question + 1).padStart(2, "0")}</div><div className="question-content"><h3>{questions[question].prompt}</h3>{questions[question].options.map((option, optionIndex) => { const key = String.fromCharCode(65 + optionIndex); return <label key={key}><input type="radio" name="answer" checked={answer === key} onChange={() => setAnswer(key)} /> <span>{key}</span> {option}</label>; })}</div></div><div className="exam-modal-bottom"><span>Answers save automatically</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => { setQuestion(question + 1); setAnswer(""); }}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => setExamOpen(false)}>Submit exam <span>✓</span></button>}</div></div></section></div>}
+      {examOpen && activeExam && questions[question] && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">{activeExam.subject}</span><h2 id="exam-title">{activeExam.title}</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body"><div className="question-number">{String(question + 1).padStart(2, "0")}</div><div className="question-content"><h3>{questions[question].prompt}</h3>{questions[question].options.map((option, optionIndex) => { const key = String.fromCharCode(65 + optionIndex); return <label key={key}><input type="radio" name={`answer-${questions[question].id}`} checked={answers[questions[question].id] === key} onChange={() => setAnswers((current) => ({ ...current, [questions[question].id]: key }))} /> <span>{key}</span> {option}</label>; })}</div></div><div className="exam-modal-bottom"><span>{examError || "Answers save automatically"}</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => setQuestion(question + 1)}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => void submitExam()}>Submit exam <span>✓</span></button>}</div></div></section></div>}
+      {examResult && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="result-title"><div className="exam-modal-top"><div><span className="subject-tag">EXAM RESULT</span><h2 id="result-title">{activeExam?.title}</h2></div><button className="close-button" onClick={() => setExamResult(null)} aria-label="Close result">×</button></div><div className="question-body"><div className="question-number">{Math.round(examResult.percentage)}%</div><div className="question-content"><h3>{examResult.passed ? "Congratulations, you passed." : "Keep practising and try again."}</h3><p>You scored {examResult.obtainedMarks} of {examResult.totalMarks} marks ({examResult.percentage}%).</p></div></div><div className="exam-modal-bottom"><span>Saved to your examination results.</span><button className="primary-button" onClick={() => setExamResult(null)}>Done</button></div></section></div>}
       {profileOpen && <ProfileModal profile={profile} onClose={() => setProfileOpen(false)} onSignOut={async () => { setProfileOpen(false); await handleSignOut(); }} />}
       {authenticated && <div className="assistant-widget"><button className="assistant-launcher" onClick={() => setAssistantOpen((open) => !open)} aria-label={assistantOpen ? "Close EduSmart assistant" : "Open EduSmart assistant"}>{assistantOpen ? "×" : "✦"}<span className="assistant-pulse" /></button>{assistantOpen && <section className="assistant-panel" role="dialog" aria-label="EduSmart support assistant"><div className="assistant-head"><div><span className="assistant-avatar">✦</span><div><strong>EduSmart assistant</strong><small>Here to help</small></div></div><button onClick={() => setAssistantOpen(false)} aria-label="Close assistant">×</button></div><div className="assistant-messages">{assistantMessages.map((message, index) => <p className={`assistant-message ${message.from}`} key={`${message.from}-${index}`}>{message.text}</p>)}</div><div className="assistant-quick-actions"><button onClick={() => askAssistant("exams", "Show my exams")}>My exams</button><button onClick={() => askAssistant("learning", "Help with learning")}>Learning help</button><button onClick={() => askAssistant("books", "Where are the books?")}>Book shop</button></div><form className="assistant-form" onSubmit={submitAssistantMessage}><input value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Ask for support..." aria-label="Ask the assistant" /><button type="submit" aria-label="Send message">↑</button></form></section>}</div>}
     </main>
