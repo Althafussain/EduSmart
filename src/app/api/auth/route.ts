@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     await createSession(user.id);
     return NextResponse.json({ user: profileResponse(await getMongoUser()) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Authentication failed.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Authentication request failed:", error);
+    return NextResponse.json({ error: "We could not complete your sign-in. Please try again." }, { status: 500 });
   }
 }

@@ -18,8 +18,8 @@ function examQuestions(value: unknown): ExamQuestionInput[] {
     const question = item as { prompt?: unknown; options?: unknown; correctAnswer?: unknown };
     return {
       prompt: String(question.prompt ?? "").trim(),
-      options: Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : [],
-      correctAnswer: resolveOptionAnswer(question.correctAnswer, Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : []),
+      options: Array.isArray(question.options) ? question.options.map((option) => String(option).trim()) : [],
+      correctAnswer: resolveOptionAnswer(question.correctAnswer, Array.isArray(question.options) ? question.options.map((option) => String(option).trim()) : []),
     };
   });
 }
@@ -46,31 +46,88 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     if (resource === "books") return NextResponse.json({ item: await prisma.book.update({ where: { id }, data: { ...body, price: body.price === undefined ? undefined : Number(body.price) } }) });
     if (resource === "videos") return NextResponse.json({ item: await prisma.video.update({ where: { id }, data: body }) });
 
-    const data: Record<string, unknown> = { ...body };
-    if (body.startsAt) data.startsAt = new Date(String(body.startsAt));
-    if (body.endsAt) data.endsAt = new Date(String(body.endsAt));
-    if (body.durationMins !== undefined) data.durationMins = Number(body.durationMins);
-    delete data.subject;
-    delete data.totalMarks;
-    if (resource === "exams" && body.questions !== undefined) {
-      const questions = examQuestions(body.questions);
-      if (questions.length === 0 || questions.some((question) => !question.prompt || question.options.length < 2 || !question.correctAnswer)) {
-        return NextResponse.json({ error: "Every exam question must have a prompt, at least two options, and a correct answer that matches one of those options." }, { status: 400 });
+    if (resource === "exams") {
+      const current = await prisma.exam.findUnique({ where: { id }, include: { questions: { orderBy: { id: "asc" } }, attempts: { select: { id: true, status: true, expiresAt: true } }, _count: { select: { attempts: true } } } });
+      if (!current) return NextResponse.json({ error: "Exam not found." }, { status: 404 });
+      const startsAt = body.startsAt === undefined ? current.startsAt : new Date(String(body.startsAt));
+      const endsAt = body.endsAt === undefined ? current.endsAt : new Date(String(body.endsAt));
+      const durationMins = body.durationMins === undefined ? current.durationMins : Number(body.durationMins);
+      if (!String(body.title ?? current.title).trim() || !Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt || !Number.isInteger(durationMins) || durationMins < 1 || durationMins > 600) {
+        return NextResponse.json({ error: "Enter a title, valid exam window, and duration between 1 and 600 minutes." }, { status: 400 });
       }
-      data.totalMarks = questions.length;
-      data.questions = { deleteMany: {}, create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) };
-    } else {
-      delete data.questions;
+      const data: Record<string, unknown> = {
+        title: String(body.title ?? current.title).trim(),
+        description: body.description === undefined ? current.description : body.description ? String(body.description) : null,
+        educationLevel: body.educationLevel === "A_LEVEL" || body.educationLevel === "O_LEVEL" || body.educationLevel === "GRADE" ? body.educationLevel : current.educationLevel,
+        grade: body.grade === undefined ? current.grade : body.grade ? Number(body.grade) : null,
+        stream: body.stream === undefined ? current.stream : body.stream ? String(body.stream) : null,
+        durationMins, startsAt, endsAt,
+        published: body.published === undefined ? current.published : Boolean(body.published),
+      };
+      if (body.subject !== undefined) {
+        const subjectName = String(body.subject).trim();
+        if (!subjectName) return NextResponse.json({ error: "Subject is required." }, { status: 400 });
+        const subject = await prisma.subject.upsert({ where: { name: subjectName }, update: {}, create: { name: subjectName } });
+        data.subject = { connect: { id: subject.id } };
+      }
+      if (body.questions !== undefined) {
+        const questions = examQuestions(body.questions);
+        const signature = (question: { prompt: string; options: unknown; correctAnswer: string | null; marks: number }) => {
+          const options = Array.isArray(question.options) ? question.options.map(String) : [];
+          return JSON.stringify({ prompt: question.prompt.trim(), options, correctAnswer: resolveOptionAnswer(question.correctAnswer, options), marks: question.marks });
+        };
+        const sameAsSaved = current.questions.map(signature);
+        const savedQuestionsUnchanged = current.questions.every((question, index) => index < questions.length && signature({ ...questions[index], marks: 1 }) === sameAsSaved[index]);
+        const changed = !savedQuestionsUnchanged || questions.length !== current.questions.length;
+        const isComplete = (question: ExamQuestionInput) => Boolean(
+          question.prompt.trim() && question.options.filter(Boolean).length >= 2 &&
+          !question.options.some((option, index) => !option && question.options.slice(index + 1).some(Boolean)) &&
+          resolveOptionAnswer(question.correctAnswer, question.options),
+        );
+
+        if (changed && current._count.attempts > 0) {
+          if (!savedQuestionsUnchanged || questions.length < current.questions.length) {
+            return NextResponse.json({ error: "Questions already used for student marks cannot be edited or removed. Add new questions at the end of the list instead." }, { status: 409 });
+          }
+          const now = new Date();
+          if (current.attempts.some((attempt) => attempt.status === "IN_PROGRESS" && attempt.expiresAt > now)) {
+            return NextResponse.json({ error: "Wait until all students currently taking this exam have submitted before adding questions." }, { status: 409 });
+          }
+          const addedQuestions = questions.slice(current.questions.length);
+          if (addedQuestions.some((question) => !isComplete(question))) {
+            return NextResponse.json({ error: "Complete each new question with a prompt, two consecutive options, and a valid correct answer." }, { status: 400 });
+          }
+          const attemptIds = current.attempts.map((attempt) => attempt.id);
+          const updated = await prisma.$transaction(async (transaction) => {
+            await transaction.examAttempt.updateMany({ where: { examId: id, status: "IN_PROGRESS", expiresAt: { lte: now } }, data: { status: "EXPIRED" } });
+            if (attemptIds.length) await transaction.result.updateMany({ where: { attemptId: { in: attemptIds }, totalMarks: null }, data: { totalMarks: current.totalMarks } });
+            await transaction.question.createMany({ data: addedQuestions.map((question) => ({ examId: id, type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) });
+            return transaction.exam.update({ where: { id }, data: { ...data, totalMarks: current.totalMarks + addedQuestions.length }, include: { subject: true, questions: { orderBy: { id: "asc" } } } });
+          });
+          return NextResponse.json({ item: updated });
+        }
+
+        if (changed) {
+          if (questions.length === 0 || questions.some((question) => !isComplete(question))) {
+            return NextResponse.json({ error: "Complete each changed question with a prompt, two consecutive options, and a valid correct answer." }, { status: 400 });
+          }
+          data.totalMarks = questions.length;
+          data.questions = { deleteMany: {}, create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) };
+        }
+      }
+      return NextResponse.json({ item: await prisma.exam.update({ where: { id }, data, include: { subject: true, questions: true } }) });
     }
-    return NextResponse.json({ item: await prisma.exam.update({ where: { id }, data }) });
+    return NextResponse.json({ error: "Unknown resource." }, { status: 404 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The item could not be updated.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error("Admin content update failed:", error);
+    return NextResponse.json({ error: "We could not save those changes. Check the details and try again." }, { status: 400 });
   }
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Administrator access is required." }, { status: 403 });
+  const user = await getMongoUser();
+  if (!user) return NextResponse.json({ error: "Your session has expired. Sign in with an administrator account to continue." }, { status: 401 });
+  if (user.role !== "admin") return NextResponse.json({ error: "The signed-in account does not have administrator permissions. Sign in with an administrator account to delete records." }, { status: 403 });
   const { resource, id } = await context.params;
   if (!resources.has(resource)) return NextResponse.json({ error: "Unknown admin resource." }, { status: 404 });
 
@@ -85,15 +142,24 @@ export async function DELETE(request: Request, context: { params: Promise<{ reso
     } else if (resource === "books") await prisma.book.delete({ where: { id } });
     else if (resource === "videos") await prisma.video.delete({ where: { id } });
     else {
-      const questions = await prisma.question.findMany({ where: { examId: id }, select: { id: true } });
-      const questionIds = questions.map((question) => question.id);
-      if (questionIds.length > 0) await prisma.studentAnswer.deleteMany({ where: { questionId: { in: questionIds } } });
-      await prisma.examAttempt.deleteMany({ where: { examId: id } });
-      await prisma.exam.delete({ where: { id } });
+      await prisma.$transaction(async (transaction) => {
+        const attempts = await transaction.examAttempt.findMany({ where: { examId: id }, select: { id: true } });
+        const attemptIds = attempts.map((attempt) => attempt.id);
+        if (attemptIds.length) {
+          await transaction.result.deleteMany({ where: { attemptId: { in: attemptIds } } });
+          await transaction.studentAnswer.deleteMany({ where: { attemptId: { in: attemptIds } } });
+          await transaction.examAttempt.deleteMany({ where: { id: { in: attemptIds } } });
+        }
+        const questions = await transaction.question.findMany({ where: { examId: id }, select: { id: true } });
+        const questionIds = questions.map((question) => question.id);
+        if (questionIds.length) await transaction.studentAnswer.deleteMany({ where: { questionId: { in: questionIds } } });
+        await transaction.question.deleteMany({ where: { examId: id } });
+        await transaction.exam.delete({ where: { id } });
+      });
     }
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The item could not be deleted.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error("Admin content deletion failed:", error);
+    return NextResponse.json({ error: "We could not delete this item. Please try again." }, { status: 400 });
   }
 }

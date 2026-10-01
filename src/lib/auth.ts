@@ -6,7 +6,11 @@ import { prisma } from "@/lib/prisma";
 
 const scrypt = promisify(scryptCallback);
 const sessionCookie = "edusmart-session";
-const sessionSecret = process.env.SESSION_SECRET ?? "development-only-change-this-secret";
+const configuredSessionSecret = process.env.SESSION_SECRET;
+if (process.env.NODE_ENV === "production" && (!configuredSessionSecret || configuredSessionSecret.length < 32)) {
+  throw new Error("SESSION_SECRET must be configured with at least 32 characters in production.");
+}
+const sessionSecret = configuredSessionSecret ?? "development-only-change-this-secret";
 const sessionDurationSeconds = 60 * 60 * 24 * 7;
 
 type SessionPayload = { userId: string; expiresAt: number };

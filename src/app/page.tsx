@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import ExamQuestionEditor from "./admin/ExamQuestionEditor";
 
@@ -49,7 +49,7 @@ const pageTranslationRows = [
 
 type ExamQuestion = { id: string; prompt: string; options: string[]; marks: number; type: string };
 type ExamResult = { obtainedMarks: number; totalMarks: number; percentage: number; passed: boolean };
-type PublishedExam = { id: string; title: string; subject: string; date: string; time: string; duration: string; tone: string; questions: ExamQuestion[]; fileName: string };
+type PublishedExam = { id: string; title: string; subject: string; date: string; time: string; duration: string; durationMins: number; tone: string; questions: ExamQuestion[]; fileName: string };
 
 function VideoPlayerModal({ video, onClose }: { video: VideoCard; onClose: () => void }) {
   return <div className="modal-backdrop" onClick={onClose}><section className="video-player-modal" role="dialog" aria-modal="true" aria-labelledby="video-player-title" onClick={(event) => event.stopPropagation()}><div className="video-player-head"><div><span className="eyebrow">NOW PLAYING · {video.subject}</span><h2 id="video-player-title">{video.title}</h2></div><button className="close-button" onClick={onClose} aria-label="Close video player">×</button></div><video className="video-player" controls autoPlay playsInline poster={video.image} src={video.videoUrl}>Your browser does not support video playback.</video><div className="video-player-foot"><span>{video.level}</span><span>{video.duration} lesson</span></div></section></div>;
@@ -92,7 +92,7 @@ function ExamUploadForm() {
       const response = await fetch("/api/admin/exams", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, subject, educationLevel: "GRADE", durationMins: Number.parseInt(duration, 10), totalMarks: questions.length, startsAt, endsAt: `${date}T23:59:00`, published: true, questions }) });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "The exam could not be published.");
-      setStatus("Published to MongoDB and the student portal.");
+      setStatus("Exam published successfully and is now available to students.");
     } catch (publishError) { setError(publishError instanceof Error ? publishError.message : "The exam could not be published."); }
     finally { setUploading(false); }
   };
@@ -175,12 +175,16 @@ export default function Home() {
   const [userRole, setUserRole] = useState<"student" | "admin" | null>(null);
   const [activeNav, setActiveNav] = useState("Overview");
   const [examOpen, setExamOpen] = useState(false);
+  const [activeExamId, setActiveExamId] = useState<string | null>(null);
+  const [attemptDeadline, setAttemptDeadline] = useState<number | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [question, setQuestion] = useState(0);
-  const [seconds, setSeconds] = useState(42 * 60 + 18);
+  const [seconds, setSeconds] = useState(0);
+  const autoSubmitStarted = useRef(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [examResult, setExamResult] = useState<ExamResult | null>(null);
   const [examError, setExamError] = useState("");
+  const submitExamRef = useRef<() => Promise<void>>(async () => undefined);
   const [educationLevel, setEducationLevel] = useState("");
   const [stream, setStream] = useState("");
   const [subjects, setSubjects] = useState<string[]>([]);
@@ -196,14 +200,14 @@ export default function Home() {
   const [assistantMessages, setAssistantMessages] = useState<{ from: "assistant" | "user"; text: string }[]>([]);
   const [assistantInput, setAssistantInput] = useState("");
   const text = translations[language as keyof typeof translations];
-  const activeExam = publishedExam ?? contentExams[0] ?? null;
+  const activeExam = publishedExam ?? contentExams.find((exam) => exam.id === activeExamId) ?? contentExams[0] ?? null;
   const questions = activeExam?.questions ?? [];
   const exams = publishedExam ? [publishedExam, ...contentExams] : contentExams;
   const languageOptions = ["English", "සිංහල", "தமிழ்"];
   const currentPortal = userRole === "admin" ? "admin" : "student";
   const cycleLanguage = () => setLanguage((current) => languageOptions[(languageOptions.indexOf(current) + 1) % languageOptions.length]);
 
-  const submitExam = async () => {
+  const submitExam = useCallback(async () => {
     if (!activeExam) return;
     setExamError("");
     try {
@@ -214,6 +218,31 @@ export default function Home() {
       setExamOpen(false);
     } catch (submitError) {
       setExamError(submitError instanceof Error ? submitError.message : "The exam could not be submitted.");
+    }
+  }, [activeExam, answers]);
+  useEffect(() => {
+    submitExamRef.current = submitExam;
+  }, [submitExam]);
+
+  const openExam = async (exam: PublishedExam) => {
+    const resumingAttempt = activeExamId === exam.id;
+    setActiveExamId(exam.id);
+    if (!resumingAttempt) setQuestion(0);
+    setExamResult(null);
+    setExamError("");
+    setAttemptDeadline(null);
+    autoSubmitStarted.current = false;
+    try {
+      const response = await fetch(`/api/exams/${exam.id}/attempt`, { method: "POST" });
+      const payload = await response.json() as { expiresAt?: string; remainingSeconds?: number; error?: string };
+      if (!response.ok || !payload.expiresAt) throw new Error(payload.error ?? "This exam could not be started.");
+      const deadline = Date.parse(payload.expiresAt);
+      if (!Number.isFinite(deadline)) throw new Error("The exam returned an invalid time limit.");
+      setAttemptDeadline(deadline);
+      setSeconds(payload.remainingSeconds ?? Math.max(0, Math.round(exam.durationMins * 60)));
+      setExamOpen(true);
+    } catch (startError) {
+      window.alert(startError instanceof Error ? startError.message : "This exam could not be started.");
     }
   };
 
@@ -268,7 +297,7 @@ export default function Home() {
       setAuthenticated(true);
       setUserRole(sessionRole);
       setAuthMessage("Signed in successfully.");
-      if (sessionRole === "admin") router.push("/admin");
+      if (sessionRole === "admin") router.replace("/admin");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Authentication failed.";
       setAuthError(message);
@@ -290,7 +319,7 @@ export default function Home() {
       setAuthenticated(true);
       setUserRole(sessionRole);
       setAuthMessage("Signed in successfully with Google.");
-      if (sessionRole === "admin") router.push("/admin");
+      if (sessionRole === "admin") router.replace("/admin");
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "Google sign-in failed.");
     } finally {
@@ -330,26 +359,38 @@ export default function Home() {
   }, [authenticated, authView]);
 
   useEffect(() => {
-    fetch("/api/auth").then((response) => response.json()).then((payload: { user?: AuthResponseUser | null }) => {
+    fetch("/api/auth", { cache: "no-store" }).then((response) => response.json()).then((payload: { user?: AuthResponseUser | null }) => {
       setAuthenticated(Boolean(payload.user));
       setUserRole(payload.user?.role === "admin" ? "admin" : payload.user ? "student" : null);
-      if (payload.user) updateProfileFromUser(payload.user);
+      if (payload.user) {
+        updateProfileFromUser(payload.user);
+        if (payload.user.role === "admin") router.replace("/admin");
+      }
     });
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     fetch("/api/content").then((response) => response.json()).then((payload: { books?: { id: string; title: string; author: string; subject: string; level: string; price: number; coverColor: string; imageUrl: string | null }[]; videos?: { id: string; title: string; subject: string; level: string; duration: string; thumbnail: string | null; videoUrl: string }[]; exams?: { id: string; title: string; startsAt: string; durationMins: number; subject: { name: string }; questions: ExamQuestion[] }[] }) => {
       setContentBooks((payload.books ?? []).map((book) => ({ ...book, price: `LKR ${book.price.toLocaleString("en-LK")}`, color: book.coverColor, imageUrl: book.imageUrl ?? "" })));
       setContentVideos((payload.videos ?? []).map((video) => ({ ...video, color: "#d6e8e1", image: video.thumbnail ?? "" })));
-      setContentExams((payload.exams ?? []).map((exam) => { const start = new Date(exam.startsAt); return { id: exam.id, title: exam.title, subject: exam.subject.name, date: start.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), time: start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }), duration: `${exam.durationMins} min`, tone: "mint", questions: exam.questions, fileName: "database exam" }; }));
+      setContentExams((payload.exams ?? []).map((exam) => { const start = new Date(exam.startsAt); return { id: exam.id, title: exam.title, subject: exam.subject.name, date: start.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), time: start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }), duration: `${exam.durationMins} min`, durationMins: exam.durationMins, tone: "mint", questions: exam.questions, fileName: "Online exam" }; }));
     }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    if (!examOpen || seconds === 0) return;
-    const timer = window.setInterval(() => setSeconds((value) => Math.max(value - 1, 0)), 1000);
+    if (attemptDeadline === null || autoSubmitStarted.current) return;
+    const updateRemainingTime = () => {
+      const remaining = Math.max(0, Math.ceil((attemptDeadline - Date.now()) / 1000));
+      setSeconds(remaining);
+      if (remaining <= 1 && !autoSubmitStarted.current) {
+        autoSubmitStarted.current = true;
+        void submitExamRef.current();
+      }
+    };
+    updateRemainingTime();
+    const timer = window.setInterval(updateRemainingTime, 250);
     return () => window.clearInterval(timer);
-  }, [examOpen, seconds]);
+  }, [attemptDeadline]);
 
   useEffect(() => {
     const handleProfileTrigger = (event: MouseEvent) => {
@@ -461,12 +502,12 @@ export default function Home() {
           <section className="section-heading"><div><p className="eyebrow">CURATED FOR YOUR PROFILE</p><h2>Keep learning</h2></div><button className="text-button">See all recommendations <span>→</span></button></section>
           <section className="video-grid">{contentVideos.map((video) => <article className="video-card" key={video.id}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</section>
 
-          <div className="lower-grid"><section><div className="section-heading compact"><div><p className="eyebrow">STAY ON TRACK</p><h2>Upcoming examinations</h2></div><button className="text-button">View calendar <span>→</span></button></div><div className="exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.title}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="arrow-button" onClick={() => setExamOpen(true)} aria-label={`Open ${exam.title}`}>↗</button></article>)}</div></section><section className="progress-panel"><div className="section-heading compact"><div><p className="eyebrow">YOUR PROGRESS</p><h2>Subject strengths</h2></div><button className="more-button">•••</button></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></div>
+          <div className="lower-grid"><section><div className="section-heading compact"><div><p className="eyebrow">STAY ON TRACK</p><h2>Upcoming examinations</h2></div><button className="text-button">View calendar <span>→</span></button></div><div className="exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.title}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="arrow-button" onClick={() => openExam(exam)} aria-label={`Open ${exam.title}`}>↗</button></article>)}</div></section><section className="progress-panel"><div className="section-heading compact"><div><p className="eyebrow">YOUR PROGRESS</p><h2>Subject strengths</h2></div><button className="more-button">•••</button></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></div>
           </>}
 
           {activeNav === "My learning" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">YOUR PERSONALISED LIBRARY</p><h1>My learning</h1><p className="subtitle">Pick up where you left off and keep your momentum going.</p></div></div><div className="learning-summary"><div><span className="eyebrow">CURRENT FOCUS</span><h2>Physics · Vectors</h2><p>68% complete · 3 lessons remaining</p></div><button className="primary-button">Continue learning <span>→</span></button></div><div className="video-grid">{contentVideos.map((video) => <article className="video-card" key={video.id}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</div></section>}
 
-          {activeNav === "Examinations" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">ASSESSMENTS AND DEADLINES</p><h1>Examinations</h1><p className="subtitle">Stay prepared for every upcoming assessment.</p></div></div><div className="exam-list nav-exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.title}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="primary-button" onClick={() => setExamOpen(true)}>Open exam <span>→</span></button></article>)}</div></section>}
+          {activeNav === "Examinations" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">ASSESSMENTS AND DEADLINES</p><h1>Examinations</h1><p className="subtitle">Stay prepared for every upcoming assessment.</p></div></div><div className="exam-list nav-exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.title}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="primary-button" onClick={() => openExam(exam)}>Open exam <span>→</span></button></article>)}</div></section>}
 
           {activeNav === "Progress" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">YOUR LEARNING JOURNEY</p><h1>Progress</h1><p className="subtitle">See where your effort is turning into results.</p></div></div><div className="stats-grid"><div className="stat-card accent"><div className="stat-label">AVG. PERFORMANCE <span>↗</span></div><div className="stat-value">78<small>%</small></div><div className="stat-foot"><span className="up">↑ 6.4%</span> from last month</div></div><div className="stat-card"><div className="stat-label">LEARNING STREAK <span>↗</span></div><div className="stat-value">12 <small>days</small></div><div className="stat-foot">+3 from last week</div></div><div className="stat-card"><div className="stat-label">HOURS LEARNED <span>↗</span></div><div className="stat-value">24<small>h</small> <em>18m</em></div><div className="stat-foot">Goal: 30h this month</div></div></div><section className="progress-panel progress-page-panel"><div className="section-heading compact"><div><p className="eyebrow">SUBJECT BREAKDOWN</p><h2>Subject strengths</h2></div></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></section>}
 
@@ -476,7 +517,7 @@ export default function Home() {
         </div>
       </section>
 
-      {examOpen && activeExam && questions[question] && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">{activeExam.subject}</span><h2 id="exam-title">{activeExam.title}</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body"><div className="question-number">{String(question + 1).padStart(2, "0")}</div><div className="question-content"><h3>{questions[question].prompt}</h3>{questions[question].options.map((option, optionIndex) => { const key = String.fromCharCode(65 + optionIndex); return <label key={key}><input type="radio" name={`answer-${questions[question].id}`} checked={answers[questions[question].id] === key} onChange={() => setAnswers((current) => ({ ...current, [questions[question].id]: key }))} /> <span>{key}</span> {option}</label>; })}</div></div><div className="exam-modal-bottom"><span>{examError || "Answers save automatically"}</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => setQuestion(question + 1)}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => void submitExam()}>Submit exam <span>✓</span></button>}</div></div></section></div>}
+      {examOpen && activeExam && questions[question] && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">{activeExam.subject}</span><h2 id="exam-title">{activeExam.title}</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body" tabIndex={0} aria-label="Question and answer choices"><div className="question-number">{String(question + 1).padStart(2, "0")}</div><div className="question-content"><h3>{questions[question].prompt}</h3>{questions[question].options.map((option, optionIndex) => { const key = String.fromCharCode(65 + optionIndex); return <label key={key}><input type="radio" name={`answer-${questions[question].id}`} checked={answers[questions[question].id] === key} onChange={() => setAnswers((current) => ({ ...current, [questions[question].id]: key }))} /> <span>{key}</span> {option}</label>; })}</div></div><div className="exam-modal-bottom"><span>{examError || "Submit before the timer ends to save your answers."}</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => setQuestion(question + 1)}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => void submitExam()}>Submit exam <span>✓</span></button>}</div></div></section></div>}
       {examResult && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="result-title"><div className="exam-modal-top"><div><span className="subject-tag">EXAM RESULT</span><h2 id="result-title">{activeExam?.title}</h2></div><button className="close-button" onClick={() => setExamResult(null)} aria-label="Close result">×</button></div><div className="question-body"><div className="question-number">{Math.round(examResult.percentage)}%</div><div className="question-content"><h3>{examResult.passed ? "Congratulations, you passed." : "Keep practising and try again."}</h3><p>You scored {examResult.obtainedMarks} of {examResult.totalMarks} marks ({examResult.percentage}%).</p></div></div><div className="exam-modal-bottom"><span>Saved to your examination results.</span><button className="primary-button" onClick={() => setExamResult(null)}>Done</button></div></section></div>}
       {profileOpen && <ProfileModal profile={profile} onClose={() => setProfileOpen(false)} onSignOut={async () => { setProfileOpen(false); await handleSignOut(); }} />}
       {authenticated && <div className="assistant-widget"><button className="assistant-launcher" onClick={() => setAssistantOpen((open) => !open)} aria-label={assistantOpen ? "Close EduSmart assistant" : "Open EduSmart assistant"}>{assistantOpen ? "×" : "✦"}<span className="assistant-pulse" /></button>{assistantOpen && <section className="assistant-panel" role="dialog" aria-label="EduSmart support assistant"><div className="assistant-head"><div><span className="assistant-avatar">✦</span><div><strong>EduSmart assistant</strong><small>Here to help</small></div></div><button onClick={() => setAssistantOpen(false)} aria-label="Close assistant">×</button></div><div className="assistant-messages">{assistantMessages.map((message, index) => <p className={`assistant-message ${message.from}`} key={`${message.from}-${index}`}>{message.text}</p>)}</div><div className="assistant-quick-actions"><button onClick={() => askAssistant("exams", "Show my exams")}>My exams</button><button onClick={() => askAssistant("learning", "Help with learning")}>Learning help</button><button onClick={() => askAssistant("books", "Where are the books?")}>Book shop</button></div><form className="assistant-form" onSubmit={submitAssistantMessage}><input value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Ask for support..." aria-label="Ask the assistant" /><button type="submit" aria-label="Send message">↑</button></form></section>}</div>}

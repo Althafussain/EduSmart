@@ -157,6 +157,7 @@ model Result {
   id                String      @id @default(auto()) @map("_id") @db.ObjectId
   attemptId         String      @unique @db.ObjectId
   obtainedMarks     Float
+  totalMarks        Float?
   percentage        Float
   passed            Boolean
   aiFeedback        String?

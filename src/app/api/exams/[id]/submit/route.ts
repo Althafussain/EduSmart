@@ -40,18 +40,23 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const answerByQuestion = new Map(submittedAnswers.map((item) => [String(item.questionId ?? ""), item.answer]));
   const now = new Date();
+  const existingAttempt = await prisma.examAttempt.findUnique({
+    where: { examId_userId: { examId, userId: user.id } },
+  });
+  if (!existingAttempt) {
+    return NextResponse.json({ error: "Start the exam before submitting answers." }, { status: 409 });
+  }
+  if (existingAttempt.status !== "IN_PROGRESS") {
+    return NextResponse.json({ error: "This exam attempt is no longer open." }, { status: 409 });
+  }
+  if (now.getTime() >= existingAttempt.expiresAt.getTime() + 5_000) {
+    await prisma.examAttempt.update({ where: { id: existingAttempt.id }, data: { status: "EXPIRED" } });
+    return NextResponse.json({ error: "The exam time has expired." }, { status: 410 });
+  }
 
   try {
     const result = await prisma.$transaction(async (transaction) => {
-      const attempt = await transaction.examAttempt.upsert({
-        where: { examId_userId: { examId, userId: user.id } },
-        update: {},
-        create: { examId, userId: user.id, startedAt: now, expiresAt: new Date(now.getTime() + exam.durationMins * 60 * 1000) },
-      });
-
-      if (attempt.status === "SUBMITTED") {
-        return transaction.result.findUnique({ where: { attemptId: attempt.id } });
-      }
+      const attempt = existingAttempt;
 
       const gradedAnswers = exam.questions.map((question) => {
         const options = Array.isArray(question.options) ? question.options.map(String) : [];
@@ -67,13 +72,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       await transaction.studentAnswer.createMany({ data: gradedAnswers });
       await transaction.examAttempt.update({ where: { id: attempt.id }, data: { status: now > attempt.expiresAt ? "EXPIRED" : "SUBMITTED", submittedAt: now } });
       await transaction.result.deleteMany({ where: { attemptId: attempt.id } });
-      return transaction.result.create({ data: { attemptId: attempt.id, obtainedMarks, percentage, passed: percentage >= 50 } });
+      return transaction.result.create({ data: { attemptId: attempt.id, obtainedMarks, totalMarks, percentage, passed: percentage >= 50 } });
     });
 
     if (!result) return NextResponse.json({ error: "The exam result could not be created." }, { status: 500 });
     return NextResponse.json({ obtainedMarks: result.obtainedMarks, totalMarks, percentage: result.percentage, passed: result.passed });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The exam could not be submitted.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error("Exam submission failed:", error);
+    return NextResponse.json({ error: "Your answers could not be submitted. Please try again." }, { status: 400 });
   }
 }

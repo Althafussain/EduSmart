@@ -16,8 +16,8 @@ async function requireAdmin() {
 }
 
 function errorResponse(error: unknown) {
-  const message = error instanceof Error ? error.message : "The request could not be completed.";
-  return NextResponse.json({ error: message }, { status: 400 });
+  console.error("Admin content request failed:", error);
+  return NextResponse.json({ error: "We could not complete that request. Check the details and try again." }, { status: 400 });
 }
 
 type ExamQuestionInput = {
@@ -47,7 +47,30 @@ export async function GET(request: Request, context: { params: Promise<{ resourc
   if (resource === "users") return NextResponse.json({ items: await prisma.user.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, email: true, fullName: true, role: true, educationLevel: true, stream: true, createdAt: true } }) });
   if (resource === "books") return NextResponse.json({ items: await prisma.book.findMany({ orderBy: { createdAt: "desc" } }) });
   if (resource === "videos") return NextResponse.json({ items: await prisma.video.findMany({ orderBy: { createdAt: "desc" } }) });
-  return NextResponse.json({ items: await prisma.exam.findMany({ orderBy: { startsAt: "desc" }, include: { subject: true, questions: true } }) });
+  const exams = await prisma.exam.findMany({
+    orderBy: { startsAt: "desc" },
+    include: {
+      subject: true,
+      questions: { orderBy: { id: "asc" } },
+      attempts: {
+        orderBy: { startedAt: "desc" },
+        select: {
+          id: true, status: true, startedAt: true, submittedAt: true, expiresAt: true,
+          user: { select: { id: true, fullName: true, email: true } },
+          result: { select: { obtainedMarks: true, totalMarks: true, percentage: true, passed: true } },
+        },
+      },
+    },
+  });
+  const now = Date.now();
+  const items = exams.map((exam) => ({
+    ...exam,
+    attempts: exam.attempts.map((attempt) => ({
+      ...attempt,
+      status: attempt.status === "IN_PROGRESS" && attempt.expiresAt.getTime() <= now ? "EXPIRED" : attempt.status,
+    })),
+  }));
+  return NextResponse.json({ items });
 }
 
 export async function POST(request: Request, context: { params: Promise<{ resource: string }> }) {
@@ -68,12 +91,18 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     if (resource === "videos") return NextResponse.json({ item: await prisma.video.create({ data: { title: String(body.title), subject: String(body.subject), level: String(body.level), duration: String(body.duration), videoUrl: String(body.videoUrl), thumbnail: body.thumbnail ? String(body.thumbnail) : null, description: body.description ? String(body.description) : null, published: Boolean(body.published) } }) }, { status: 201 });
 
     const subjectName = String(body.subject ?? "").trim();
+    const startsAt = new Date(String(body.startsAt));
+    const endsAt = new Date(String(body.endsAt));
+    const durationMins = Number(body.durationMins);
+    if (!subjectName || !String(body.title ?? "").trim() || !Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || endsAt <= startsAt || !Number.isInteger(durationMins) || durationMins < 1 || durationMins > 600) {
+      return NextResponse.json({ error: "Enter a title, subject, valid exam window, and duration between 1 and 600 minutes." }, { status: 400 });
+    }
     const subject = await prisma.subject.upsert({ where: { name: subjectName }, update: {}, create: { name: subjectName } });
     const questions = examQuestions(body.questions);
     if (questions.length === 0 || questions.some((question) => !question.prompt || question.options.length < 2 || !question.correctAnswer)) {
       return NextResponse.json({ error: "Every exam question must have a prompt, at least two options, and a correct answer that matches one of those options." }, { status: 400 });
     }
-    const exam = await prisma.exam.create({ data: { title: String(body.title), description: body.description ? String(body.description) : null, educationLevel: body.educationLevel === "A_LEVEL" || body.educationLevel === "O_LEVEL" ? body.educationLevel : "GRADE", grade: body.grade ? Number(body.grade) : null, stream: body.stream ? String(body.stream) : null, durationMins: Number(body.durationMins), totalMarks: questions.length, startsAt: new Date(String(body.startsAt)), endsAt: new Date(String(body.endsAt)), published: Boolean(body.published), subjectId: subject.id, questions: { create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) } }, include: { subject: true, questions: true } });
+    const exam = await prisma.exam.create({ data: { title: String(body.title).trim(), description: body.description ? String(body.description) : null, educationLevel: body.educationLevel === "A_LEVEL" || body.educationLevel === "O_LEVEL" ? body.educationLevel : "GRADE", grade: body.grade ? Number(body.grade) : null, stream: body.stream ? String(body.stream) : null, durationMins, totalMarks: questions.length, startsAt, endsAt, published: Boolean(body.published), subjectId: subject.id, questions: { create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) } }, include: { subject: true, questions: true } });
     return NextResponse.json({ item: exam }, { status: 201 });
   } catch (error) {
     return errorResponse(error);

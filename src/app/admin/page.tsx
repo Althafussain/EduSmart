@@ -10,5 +10,5 @@ export default async function AdminPage() {
     redirect("/");
   }
 
-  return <AdminDashboardRoute />;
+  return <AdminDashboardRoute adminName={user.fullName} />;
 }
