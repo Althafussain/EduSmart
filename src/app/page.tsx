@@ -380,8 +380,24 @@ export default function Home() {
 
   useEffect(() => {
     fetch("/api/content").then((response) => response.json()).then((payload: { books?: { id: string; title: string; author: string; subject: string; level: string; price: number; coverColor: string; imageUrl: string | null }[]; videos?: { id: string; title: string; subject: string; level: string; duration: string; thumbnail: string | null; videoUrl: string }[]; exams?: { id: string; title: string; startsAt: string; durationMins: number; subject: { name: string }; questions: ExamQuestion[] }[]; writtenPapers?: PublishedWrittenPaper[] }) => {
-      setContentBooks((payload.books ?? []).map((book) => ({ ...book, price: `LKR ${book.price.toLocaleString("en-LK")}`, color: book.coverColor, imageUrl: book.imageUrl ?? "" })));
-      setContentVideos((payload.videos ?? []).map((video) => ({ ...video, color: "#d6e8e1", image: video.thumbnail ?? "" })));
+      const bookPlaceholders = [
+        "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1589829085413-56de8ae18c73?w=400&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1541963463532-d68292c34b19?w=400&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400&h=600&fit=crop",
+      ];
+      const videoPlaceholders = [
+        "https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=640&h=360&fit=crop",
+        "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=640&h=360&fit=crop",
+        "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=640&h=360&fit=crop",
+        "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=640&h=360&fit=crop",
+        "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=640&h=360&fit=crop",
+        "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=640&h=360&fit=crop",
+      ];
+      setContentBooks((payload.books ?? []).map((book, idx) => ({ ...book, price: `LKR ${book.price.toLocaleString("en-LK")}`, color: book.coverColor, imageUrl: book.imageUrl && book.imageUrl.trim() ? book.imageUrl : bookPlaceholders[idx % bookPlaceholders.length] })));
+      setContentVideos((payload.videos ?? []).map((video, idx) => ({ ...video, color: "#d6e8e1", image: video.thumbnail && video.thumbnail.trim() ? video.thumbnail : videoPlaceholders[idx % videoPlaceholders.length] })));
       setContentExams((payload.exams ?? []).map((exam) => { const start = new Date(exam.startsAt); return { id: exam.id, title: exam.title, subject: exam.subject.name, date: start.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), time: start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }), duration: `${exam.durationMins} min`, durationMins: exam.durationMins, tone: "mint", questions: exam.questions, fileName: "Online exam" }; }));
       setWrittenPapers(payload.writtenPapers ?? []);
     }).catch(() => undefined);
