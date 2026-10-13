@@ -482,6 +482,11 @@ if (!authenticated) {
         <nav className="landing-nav" role="navigation" aria-label="Main navigation">
           <div className="landing-nav-container">
             <div className="landing-nav-brand"><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div>
+            <div className="landing-nav-links">
+              <a href="#hero-title" className="landing-nav-link" onClick={(e) => { e.preventDefault(); document.getElementById('hero-title')?.scrollIntoView({ behavior: 'smooth' }); }}>Home</a>
+              <a href="#features-title" className="landing-nav-link" onClick={(e) => { e.preventDefault(); document.getElementById('features-title')?.scrollIntoView({ behavior: 'smooth' }); }}>Resources</a>
+              <a href="#" className="landing-nav-link">Contact Us</a>
+            </div>
             <div className="landing-nav-actions">
               <button className="landing-btn-secondary" onClick={() => { setPortal("student"); setAuthView("login"); setShowAuthPanel(true); }}>Login</button>
               <button className="landing-btn-primary" onClick={() => { setPortal("student"); setAuthView("signup"); setShowAuthPanel(true); }}>Register</button>
@@ -491,7 +496,7 @@ if (!authenticated) {
 
         <section className="landing-section landing-hero-section" aria-labelledby="hero-title">
           <div className="landing-container">
-            <div className="landing-hero reveal">
+            <div className="landing-hero">
               <div className="landing-hero-badge animate-fade-in-up">🚀 New: AI-powered learning insights</div>
               <h1 id="hero-title" className="landing-hero-title animate-fade-in-up delay-100">Your next breakthrough starts here.</h1>
               <p className="landing-hero-subtitle animate-fade-in-up delay-200">One focused space for Sri Lankan students to learn with purpose, practise with confidence, and see their progress clearly.</p>
