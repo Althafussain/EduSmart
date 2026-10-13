@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { normalizeOptionAnswer } from "@/lib/exam-answers";
+import { parseExamQuestions } from "@/lib/exam-question-text";
 import path from "node:path";
-import { createCanvas } from "@napi-rs/canvas";
-import JSZip from "jszip";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import mammoth from "mammoth";
 import { createWorker } from "tesseract.js";
 
@@ -18,6 +17,7 @@ const allowedTypes = new Set([
   "image/png",
   "image/jpeg",
   "image/webp",
+  "image/gif",
 ]);
 const OCR_LANGUAGES = "eng+sin+tam";
 
@@ -26,51 +26,24 @@ export type ExtractedQuestion = {
   prompt: string;
   options: string[];
   correctAnswer: string | null;
+  imageUrl?: string | null;
+  optionImages?: string[];
 };
 
 function extractQuestions(text: string): ExtractedQuestion[] {
-  const normalizedText = text.replace(/\r/g, "");
-  const answerKeyStart = normalizedText.search(/(?:^|\n)\s*(?:answer\s+key|correct\s+answers?|marking\s+scheme)\s*:?\s*(?=\n|$)/i);
-  const questionText = answerKeyStart >= 0 ? normalizedText.slice(0, answerKeyStart) : normalizedText;
-  const answerKeyText = answerKeyStart >= 0 ? normalizedText.slice(answerKeyStart) : "";
-  const normalized = questionText.replace(/[ \t]+/g, " ").trim();
-  // Papers vary between `1.`, `1)`, `(1)`, `Q1`, `Q. 1`, and `Question 1`.
-  // Accept these at line starts so later questions are not swallowed into the
-  // first block when their numbering style differs from the first question.
-  const questionStart = /(?:^|\n)\s*(?:(?:question|q)\.?\s*(?:no\.?\s*)?)?[\[(]?(\d{1,3})[\])]?(?:\s*[.,)\-:]+\s*|\s+(?=[A-Z0-9]))/gim;
-  const lineMatches = [...normalized.matchAll(questionStart)];
-  // Some PDFs flatten numbered questions onto the same line. Compare the
-  // broader pass even when multiple line-start questions were found, otherwise
-  // the parser quietly leaves inline questions inside their predecessor.
-  const inlineMatches = [...normalized.matchAll(/(?:^|\s)(?:(?:question|q)\.?\s*(?:no\.?\s*)?)?[\[(]?(\d{1,3})[\])]?(?:\s*[.,)\-:]+\s*|\s+(?=[A-Z0-9]))/gi)];
-  const matches = inlineMatches.length > lineMatches.length ? inlineMatches : lineMatches;
-
-  if (matches.length === 0) return [];
-
-  const answerKey = new Map<string, string>();
-  for (const match of answerKeyText.matchAll(/(?:^|\s)(\d{1,3})\s*[.,)\-:]?\s*([A-E]|[1-5])\b/gi)) {
-    answerKey.set(match[1], match[2].toUpperCase());
-  }
-
-  return matches.map((match, index) => {
-    const questionNumber = match[1];
-    const start = (match.index ?? 0) + match[0].length;
-    const end = index + 1 < matches.length ? matches[index + 1].index ?? normalized.length : normalized.length;
-    const block = normalized.slice(start, end).replace(/\s+/g, " ").trim();
-    const answerMatch = block.match(/(?:correct\s+answer|answer|ans)\s*[:\-]?\s*([A-E]|[1-5])\b/i);
-    const withoutAnswer = block.replace(/\s*(?:correct\s+answer|answer|ans)\s*[:\-]?\s*(?:[A-E]|[1-5])\b.*$/i, "").trim();
-    let optionMatches = [...withoutAnswer.matchAll(/(?:^|\s)(?:\(([1-5A-E])\)|([A-E1-5])\s*[.)\-:])\s*(.*?)(?=\s+(?:\([1-5A-E]\)|[A-E1-5]\s*[.)\-:])\s+|$)/gi)];
-    if (optionMatches.length < 2) {
-      optionMatches = [...withoutAnswer.matchAll(/(?:^|\s)(?:\(([1-5A-E])\)|([A-E1-5])\s+)\s*(.*?)(?=\s+(?:\([1-5A-E]\)|[A-E1-5])\s+|$)/gi)];
-    }
-    const firstOptionIndex = optionMatches[0]?.index;
-    const prompt = (firstOptionIndex === undefined ? withoutAnswer : withoutAnswer.slice(0, firstOptionIndex)).trim();
-    const options = optionMatches.map((option) => option[3].trim()).filter(Boolean);
-
-    return { questionNumber: Number(questionNumber), prompt, options, correctAnswer: normalizeOptionAnswer(answerMatch?.[1] ?? answerKey.get(questionNumber)) };
-  // Keep the question block even if OCR misses one or more option labels. The
-  // admin editor can correct the choices; dropping the block hid later questions.
-  }).filter((question) => question.prompt);
+  // The shared parser already separates question blocks from the answer key,
+  // recognises labelled and unlabelled choices, and places each answer into its
+  // option so nothing has to be entered by hand.
+  return parseExamQuestions(text)
+    .filter((question) => question.prompt)
+    .map((question, index) => ({
+      questionNumber: question.questionNumber ?? index + 1,
+      prompt: question.prompt,
+      options: question.options,
+      correctAnswer: question.correctAnswer,
+      imageUrl: question.imageUrl ?? null,
+      optionImages: (question.optionImages ?? []).filter((image): image is string => typeof image === "string"),
+    }));
 }
 
 function mergeQuestions(primary: ExtractedQuestion[], secondary: ExtractedQuestion[]) {
@@ -141,24 +114,46 @@ async function recognizeImages(images: Buffer[]) {
   }
 }
 
+async function makeQuestionImage(buffer: Buffer) {
+  const image = await loadImage(buffer);
+  // Keep diagrams crisp and preserve their original layout. Only large source
+  // images are reduced, and a lossless PNG is preferred whenever it stays
+  // within the per-image storage limit.
+  const scale = Math.min(1, 2400 / Math.max(image.width, image.height));
+  const canvas = createCanvas(Math.max(1, Math.round(image.width * scale)), Math.max(1, Math.round(image.height * scale)));
+  try {
+    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+    const png = canvas.toBuffer("image/png");
+    if (png.byteLength <= 5 * 1024 * 1024) return `data:image/png;base64,${png.toString("base64")}`;
+    const webp = canvas.toBuffer("image/webp", 95);
+    return `data:image/webp;base64,${webp.toString("base64")}`;
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+}
+
 async function recognizePdf(buffer: Buffer) {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const document = await pdfjs.getDocument({ data: new Uint8Array(buffer), useSystemFonts: true }).promise;
   let worker: Awaited<ReturnType<typeof createOcrWorker>> | undefined;
   try {
     worker = await createOcrWorker();
-    const results: string[] = [];
+    const pages: { text: string; imageUrl: string | null }[] = [];
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       let page: Awaited<ReturnType<typeof document.getPage>> | undefined;
       try {
         page = await document.getPage(pageNumber);
+        const operators = await page.getOperatorList();
+        const containsEmbeddedImage = operators.fnArray.some((operator) => operator === pdfjs.OPS.paintImageXObject || operator === pdfjs.OPS.paintImageMaskXObject || operator === pdfjs.OPS.paintInlineImageXObject);
         const viewport = page.getViewport({ scale: 2 });
         const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
         try {
           await page.render({ canvas: canvas as unknown as HTMLCanvasElement, canvasContext: canvas.getContext("2d") as unknown as CanvasRenderingContext2D, viewport }).promise;
           const image = canvas.toBuffer("image/png");
           const result = await worker.recognize(image);
-          results.push(result.data.text);
+          const pageImage = containsEmbeddedImage ? await makeQuestionImage(image) : null;
+          pages.push({ text: result.data.text, imageUrl: pageImage });
         } finally {
           canvas.width = 0;
           canvas.height = 0;
@@ -170,7 +165,7 @@ async function recognizePdf(buffer: Buffer) {
         page?.cleanup();
       }
     }
-    return { text: results.join("\n"), pagesScanned: document.numPages };
+    return { text: pages.map((page) => page.text).join("\n"), pagesScanned: document.numPages, pages };
   } finally {
     if (worker) await worker.terminate();
     await document.cleanup();
@@ -201,28 +196,57 @@ async function extractPdfText(buffer: Buffer) {
         .join("\n"));
       page.cleanup();
     }
-    return pages.join("\n");
+    return pages;
   } finally {
     await document.cleanup();
   }
 }
 
-async function recognizeDocxImages(buffer: Buffer) {
-  const archive = await JSZip.loadAsync(buffer);
-  const imageFiles = Object.values(archive.files)
-    .filter((entry) => !entry.dir && entry.name.startsWith("word/media/"))
-    .sort((first, second) => first.name.localeCompare(second.name, undefined, { numeric: true }));
-  if (imageFiles.length === 0) return { text: "", imagesScanned: 0 };
+function docxHtmlText(html: string) {
+  return html
+    .replace(/<img\b[^>]*src=["']edusmart-image-(\d+)["'][^>]*>/gi, (_tag, index: string) => ` [DOC_IMAGE_${index}] `)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:p|h[1-6]|li|tr|div|table)>/gi, "\n")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'");
+}
+
+async function extractDocxImages(buffer: Buffer) {
+  const imageFiles: { buffer: Buffer; imageUrl: string }[] = [];
+  const converted = await mammoth.convertToHtml({ buffer }, {
+    convertImage: mammoth.images.imgElement(async (image) => {
+      const imageBuffer = await image.read();
+      const index = imageFiles.length;
+      imageFiles.push({ buffer: imageBuffer, imageUrl: await makeQuestionImage(imageBuffer) });
+      return { src: `edusmart-image-${index}` };
+    }),
+  });
+  const textWithMarkers = docxHtmlText(converted.value);
+  if (imageFiles.length === 0) return { text: "", imagesScanned: 0, images: [] as { text: string; imageUrl: string }[] };
 
   const worker = await createOcrWorker();
   try {
-    const results: string[] = [];
-    for (const imageFile of imageFiles) {
-      const image = await imageFile.async("nodebuffer");
-      const result = await worker.recognize(image);
-      results.push(result.data.text);
+    const images: { text: string; imageUrl: string }[] = [];
+    for (let index = 0; index < imageFiles.length; index += 1) {
+      const image = imageFiles[index];
+      const ocr = await worker.recognize(image.buffer);
+      const marker = `[DOC_IMAGE_${index}]`;
+      const markerPosition = textWithMarkers.indexOf(marker);
+      const textBeforeImage = markerPosition >= 0 ? textWithMarkers.slice(0, markerPosition).replace(/\[DOC_IMAGE_\d+\]/g, " ") : "";
+      const nearbyQuestion = extractQuestions(textBeforeImage).at(-1);
+      const imageQuestion = extractQuestions(ocr.data.text)[0];
+      const mappedQuestion = imageQuestion ?? nearbyQuestion;
+      const imageText = mappedQuestion
+        ? `Question ${mappedQuestion.questionNumber}. ${mappedQuestion.prompt}`
+        : ocr.data.text;
+      images.push({ text: imageText, imageUrl: image.imageUrl });
     }
-    return { text: results.join("\n"), imagesScanned: imageFiles.length };
+    return { text: images.map((image) => image.text).join("\n"), imagesScanned: imageFiles.length, images };
   } finally {
     await worker.terminate();
   }
@@ -256,20 +280,25 @@ export async function POST(request: Request) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   let text = "";
+  let textPages: string[] = [];
   let ocrText = "";
   let pagesScanned: number | null = null;
   let imagesScanned: number | null = null;
+  let imageSources: { text: string; imageUrl: string }[] = [];
+  let directImageUrl: string | null = null;
 
   try {
     if (file.name.toLowerCase().endsWith(".pdf")) {
       try {
-        text = await extractPdfText(buffer);
+        textPages = await extractPdfText(buffer);
+        text = textPages.join("\n");
       } catch {
         text = "";
       }
       const scan = await recognizePdf(buffer);
       ocrText = scan.text;
       pagesScanned = scan.pagesScanned;
+      imageSources = scan.pages.flatMap((page, index) => page.imageUrl ? [{ text: `${textPages[index] ?? ""}\n${page.text}`, imageUrl: page.imageUrl }] : []);
     } else if (file.name.toLowerCase().endsWith(".docx")) {
       try {
         const result = await mammoth.extractRawText({ buffer });
@@ -277,12 +306,16 @@ export async function POST(request: Request) {
       } catch {
         text = "";
       }
-      const scan = await recognizeDocxImages(buffer);
+      const scan = await extractDocxImages(buffer);
       ocrText = scan.text;
       imagesScanned = scan.imagesScanned;
+      imageSources = scan.images;
     } else {
       ocrText = await recognizeImages([buffer]);
       imagesScanned = 1;
+      directImageUrl = buffer.byteLength <= 5 * 1024 * 1024
+        ? `data:${file.type};base64,${buffer.toString("base64")}`
+        : await makeQuestionImage(buffer);
     }
   } catch (error) {
     console.error("Exam document processing failed:", error);
@@ -295,6 +328,9 @@ export async function POST(request: Request) {
 
   const questions = mergeQuestions(extractQuestions(text), extractQuestions(ocrText));
   if (questions.length === 0) {
+    if (directImageUrl) {
+      return NextResponse.json({ fileName: file.name, pagesScanned, imagesScanned, extractedText: ocrText.trim(), imageUrl: directImageUrl, questions: [] });
+    }
     const scanned = pagesScanned !== null
       ? `All ${pagesScanned} PDF pages were scanned. `
       : imagesScanned !== null
@@ -303,11 +339,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `${scanned}No numbered question blocks were recognized. Check that the paper has readable question numbers or labels such as Question 1 or Q1.` }, { status: 422 });
   }
 
+  const normalizeWords = (value: string) => value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const imageSourcesForQuestion = (question: ExtractedQuestion) => {
+    if (directImageUrl) return [];
+    const promptWords = new Set(normalizeWords(question.prompt).split(/\s+/).filter((word) => word.length > 2));
+    return imageSources.filter((candidate) => extractQuestions(candidate.text).some((sourceQuestion) => {
+      if (sourceQuestion.questionNumber !== question.questionNumber) return false;
+      const sourceWords = new Set(normalizeWords(sourceQuestion.prompt).split(/\s+/).filter((word) => word.length > 2));
+      const overlap = [...promptWords].filter((word) => sourceWords.has(word)).length / Math.max(promptWords.size, sourceWords.size, 1);
+      return overlap >= 0.45 || normalizeWords(sourceQuestion.prompt) === normalizeWords(question.prompt);
+    }));
+  };
+  const imageForQuestion = (question: ExtractedQuestion) => directImageUrl ?? imageSourcesForQuestion(question)[0]?.imageUrl ?? null;
+
   return NextResponse.json({
     fileName: file.name,
     pagesScanned,
     imagesScanned,
-    extractedText: text.trim(),
-    questions: questions.map(({ prompt, options, correctAnswer }) => ({ prompt, options, correctAnswer })),
+    extractedText: [text, ocrText].filter(Boolean).join("\n").trim(),
+    imageUrl: directImageUrl,
+    questions: questions.map((question) => {
+      const sources = imageSourcesForQuestion(question);
+      const isOptionImageSet = sources.length >= 2 && sources.length <= 5 && question.options.length <= sources.length;
+      const options = isOptionImageSet && question.options.length < sources.length
+        ? [...question.options, ...Array.from({ length: sources.length - question.options.length }, () => "")]
+        : question.options;
+      return {
+        prompt: question.prompt,
+        options,
+        correctAnswer: question.correctAnswer,
+        imageUrl: isOptionImageSet ? null : imageForQuestion(question),
+        optionImages: isOptionImageSet ? sources.map((source) => source.imageUrl) : [],
+      };
+    }),
   });
 }

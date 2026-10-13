@@ -3,6 +3,8 @@ export function normalizeOptionAnswer(value: unknown): string | null {
   const answer = value.trim().toUpperCase();
   if (/^[A-E]$/.test(answer)) return answer;
   if (/^[1-5]$/.test(answer)) return String.fromCharCode(64 + Number(answer));
+  const romanOptions: Record<string, string> = { I: "A", II: "B", III: "C", IV: "D", V: "E" };
+  if (romanOptions[answer]) return romanOptions[answer];
   return null;
 }
 

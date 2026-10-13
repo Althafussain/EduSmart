@@ -113,6 +113,8 @@ model Question {
   examId         String          @db.ObjectId
   type           QuestionType
   prompt         String
+  imageUrl       String?
+  optionImages   String[]        @default([])
   marks          Int
   options        Json?
   correctAnswer  String?
@@ -206,6 +208,36 @@ model Video {
   published   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model WrittenPaper {
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  title          String
+  subject        String
+  educationLevel EducationLevel
+  grade          Int?
+  stream         String?
+  fileName       String
+  durationMins   Int?           @default(60)
+  mimeType       String
+  document       Bytes
+  published      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model WrittenPaperAttempt {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  paperId     String   @db.ObjectId
+  userId      String   @db.ObjectId
+  startedAt   DateTime @default(now())
+  expiresAt   DateTime
+  submittedAt DateTime?
+  fileName    String?
+  mimeType    String?
+  document    Bytes?
+
+  @@unique([paperId, userId])
 }
 
 model LearningHistory {

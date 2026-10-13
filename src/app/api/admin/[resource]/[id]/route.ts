@@ -10,16 +10,18 @@ async function isAdmin() {
   return (await getMongoUser())?.role === "admin";
 }
 
-type ExamQuestionInput = { prompt: string; options: string[]; correctAnswer: string | null };
+type ExamQuestionInput = { prompt: string; options: string[]; correctAnswer: string | null; imageUrl: string | null; optionImages: string[] };
 
 function examQuestions(value: unknown): ExamQuestionInput[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => {
-    const question = item as { prompt?: unknown; options?: unknown; correctAnswer?: unknown };
+    const question = item as { prompt?: unknown; options?: unknown; correctAnswer?: unknown; imageUrl?: unknown; optionImages?: unknown };
     return {
       prompt: String(question.prompt ?? "").trim(),
       options: Array.isArray(question.options) ? question.options.map((option) => String(option).trim()) : [],
       correctAnswer: resolveOptionAnswer(question.correctAnswer, Array.isArray(question.options) ? question.options.map((option) => String(option).trim()) : []),
+      imageUrl: typeof question.imageUrl === "string" && /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(question.imageUrl) && question.imageUrl.length <= 7_000_000 ? question.imageUrl : null,
+      optionImages: Array.isArray(question.optionImages) ? question.optionImages.slice(0, 5).map((image) => typeof image === "string" && /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(image) && image.length <= 7_000_000 ? image : "") : [],
     };
   });
 }
@@ -72,16 +74,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
       }
       if (body.questions !== undefined) {
         const questions = examQuestions(body.questions);
-        const signature = (question: { prompt: string; options: unknown; correctAnswer: string | null; marks: number }) => {
+        const signature = (question: { prompt: string; options: unknown; correctAnswer: string | null; imageUrl?: string | null; optionImages?: string[]; marks: number }) => {
           const options = Array.isArray(question.options) ? question.options.map(String) : [];
-          return JSON.stringify({ prompt: question.prompt.trim(), options, correctAnswer: resolveOptionAnswer(question.correctAnswer, options), marks: question.marks });
+          return JSON.stringify({ prompt: question.prompt.trim(), options, correctAnswer: resolveOptionAnswer(question.correctAnswer, options), imageUrl: question.imageUrl ?? null, optionImages: question.optionImages ?? [], marks: question.marks });
         };
         const sameAsSaved = current.questions.map(signature);
         const savedQuestionsUnchanged = current.questions.every((question, index) => index < questions.length && signature({ ...questions[index], marks: 1 }) === sameAsSaved[index]);
         const changed = !savedQuestionsUnchanged || questions.length !== current.questions.length;
         const isComplete = (question: ExamQuestionInput) => Boolean(
-          question.prompt.trim() && question.options.filter(Boolean).length >= 2 &&
-          !question.options.some((option, index) => !option && question.options.slice(index + 1).some(Boolean)) &&
+          question.prompt.trim() && question.options.filter((option, index) => Boolean(option) || Boolean(question.optionImages[index])).length >= 2 &&
+          !question.options.some((option, index) => !option && !question.optionImages[index] && question.options.slice(index + 1).some((later, laterIndex) => Boolean(later) || Boolean(question.optionImages[index + 1 + laterIndex]))) &&
           resolveOptionAnswer(question.correctAnswer, question.options),
         );
 
@@ -101,7 +103,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
           const updated = await prisma.$transaction(async (transaction) => {
             await transaction.examAttempt.updateMany({ where: { examId: id, status: "IN_PROGRESS", expiresAt: { lte: now } }, data: { status: "EXPIRED" } });
             if (attemptIds.length) await transaction.result.updateMany({ where: { attemptId: { in: attemptIds }, totalMarks: null }, data: { totalMarks: current.totalMarks } });
-            await transaction.question.createMany({ data: addedQuestions.map((question) => ({ examId: id, type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) });
+            await transaction.question.createMany({ data: addedQuestions.map((question) => ({ examId: id, type: "MCQ", prompt: question.prompt, imageUrl: question.imageUrl, optionImages: question.optionImages, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) });
             return transaction.exam.update({ where: { id }, data: { ...data, totalMarks: current.totalMarks + addedQuestions.length }, include: { subject: true, questions: { orderBy: { id: "asc" } } } });
           });
           return NextResponse.json({ item: updated });
@@ -112,7 +114,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
             return NextResponse.json({ error: "Complete each changed question with a prompt, two consecutive options, and a valid correct answer." }, { status: 400 });
           }
           data.totalMarks = questions.length;
-          data.questions = { deleteMany: {}, create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) };
+          data.questions = { deleteMany: {}, create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, imageUrl: question.imageUrl, optionImages: question.optionImages, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) };
         }
       }
       return NextResponse.json({ item: await prisma.exam.update({ where: { id }, data, include: { subject: true, questions: true } }) });

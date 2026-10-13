@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import ExamQuestionEditor from "./admin/ExamQuestionEditor";
+import WrittenPaperAttempt from "./WrittenPaperAttempt";
+import StudentProgress from "./StudentProgress";
 
 declare global {
   interface Window {
@@ -28,7 +30,8 @@ const streamSubjects: Record<string, string[]> = {
 };
 
 type BookCard = { id: string; title: string; author: string; subject: string; level: string; price: string; color: string; imageUrl: string };
-type ExtractedExamQuestion = { prompt: string; options: string[]; correctAnswer: string | null };
+type ExtractedExamQuestion = { prompt: string; options: string[]; correctAnswer: string | null; imageUrl?: string | null; optionImages?: (string | null)[] };
+type PublishedWrittenPaper = { id: string; title: string; subject: string; educationLevel: string; grade: number | null; stream: string | null; fileName: string; durationMins: number };
 
 const assistantReplies: Record<string, string> = {
   exams: "You have two upcoming examinations. Combined Mathematics is on 18 Sep at 09:00 AM, followed by Physics on 24 Sep at 02:00 PM.",
@@ -47,8 +50,9 @@ const pageTranslationRows = [
   ["LEARNING, IN MOTION", "ඉගෙනීම, චලනයේ", "கற்றல், இயக்கத்தில்"], ["Your next breakthrough starts here.", "ඔබේ ඊළඟ ජයග්‍රහණය මෙතැනින් ආරම්භ වේ.", "உங்கள் அடுத்த முன்னேற்றம் இங்கே தொடங்குகிறது."], ["One focused space for Sri Lankan students to learn with purpose, practise with confidence, and see their progress clearly.", "ශ්‍රී ලාංකික සිසුන්ට අරමුණකින් ඉගෙනීමට, විශ්වාසයෙන් පුහුණු වීමට සහ ප්‍රගතිය පැහැදිලිව දැකීමට එක් ස්ථානයක්.", "இலங்கை மாணவர்கள் நோக்கத்துடன் கற்கவும், நம்பிக்கையுடன் பயிற்சி செய்யவும், முன்னேற்றத்தைத் தெளிவாகக் காணவும் ஒரே இடம்."], ["Built around your goals", "ඔබේ ඉලක්ක වටා ගොඩනගා ඇත", "உங்கள் இலக்குகளைச் சுற்றி உருவாக்கப்பட்டது"], ["Personalised learning paths for every subject, stream, and stage.", "සෑම විෂයකටම, ධාරාවකටම සහ අදියරකටම පුද්ගලීකරණය කළ ඉගෙනුම් මාර්ග.", "ஒவ்வொரு பாடம், பிரிவு மற்றும் நிலையிற்கும் தனிப்பயன் கற்றல் பாதைகள்."], ["STUDENT SPACE", "ශිෂ්‍ය අවකාශය", "மாணவர் இடம்"], ["WELCOME BACK", "නැවත සාදරයෙන් පිළිගනිමු", "மீண்டும் வரவேற்கிறோம்"], ["Sign in as student", "ශිෂ්‍යයෙකු ලෙස ඇතුළු වන්න", "மாணவராக உள்நுழைக"], ["Create an account", "ගිණුමක් සාදන්න", "கணக்கை உருவாக்கு"], ["Forgot password?", "මුරපදය අමතකද?", "கடவுச்சொல்லை மறந்துவிட்டீர்களா?"], ["Good morning, Nethmi", "සුභ උදෑසනක්, නෙත්මි", "காலை வணக்கம், நேத்மி"], ["Keep learning", "ඉගෙනීම දිගටම කරගෙන යන්න", "தொடர்ந்து கற்றுக்கொள்ளுங்கள்"], ["Upcoming examinations", "ඉදිරි විභාග", "வரவிருக்கும் பரீட்சைகள்"], ["Subject strengths", "විෂය ශක්තීන්", "பாட வலிமைகள்"], ["See all recommendations", "සියලු නිර්දේශ බලන්න", "அனைத்து பரிந்துரைகளையும் காண்க"], ["View calendar", "දින දර්ශනය බලන්න", "நாட்காட்டியைக் காண்க"], ["Stay on track", "මාර්ගයේ රැඳී සිටින්න", "பாதையில் தொடருங்கள்"], ["YOUR PROGRESS", "ඔබේ ප්‍රගතිය", "உங்கள் முன்னேற்றம்"], ["Book shop", "පොත් සාප්පුව", "புத்தகக் கடை"], ["Get trusted revision guides and practice papers delivered to you.", "විශ්වාසදායක පුනරීක්ෂණ මාර්ගෝපදේශ සහ පුහුණු ප්‍රශ්න පත්‍ර ලබා ගන්න.", "நம்பகமான மீளாய்வு வழிகாட்டிகள் மற்றும் பயிற்சி வினாத்தாள்களைப் பெறுங்கள்."], ["Add to basket", "බාස්කට්ටුවට එක් කරන්න", "கூடையில் சேர்"], ["Checkout", "ගෙවීම", "செலுத்துதல்"], ["Settings", "සැකසුම්", "அமைப்புகள்"], ["Profile details", "පැතිකඩ විස්තර", "சுயவிவர விவரங்கள்"], ["Learning experience", "ඉගෙනුම් අත්දැකීම", "கற்றல் அனுபவம்"], ["Study reminders", "අධ්‍යයන මතක් කිරීම්", "படிப்பு நினைவூட்டல்கள்"], ["Compact layout", "සංක්ෂිප්ත පිරිසැලසුම", "சுருக்கமான அமைப்பு"], ["Save settings", "සැකසුම් සුරකින්න", "அமைப்புகளைச் சேமி"], ["Notifications", "දැනුම්දීම්", "அறிவிப்புகள்"], ["Mark all as read", "සියල්ල කියවූ ලෙස සලකුණු කරන්න", "அனைத்தையும் படித்ததாகக் குறிக்கவும்"], ["All caught up", "සියල්ල යාවත්කාලීනයි", "அனைத்தும் படிக்கப்பட்டது"], ["Here to help", "උදව් කිරීමට සූදානම්", "உதவ தயாராக உள்ளது"], ["Ask for support...", "සහාය සඳහා විමසන්න...", "ஆதரவைக் கேளுங்கள்..."], ["My exams", "මගේ විභාග", "என் பரீட்சைகள்"], ["Learning help", "ඉගෙනුම් උදව්", "கற்றல் உதவி"], ["Where are the books?", "පොත් කොහේද?", "புத்தகங்கள் எங்கே?"], ["Send message", "පණිවිඩය යවන්න", "செய்தியை அனுப்பு"] ,
 ] as const;
 
-type ExamQuestion = { id: string; prompt: string; options: string[]; marks: number; type: string };
-type ExamResult = { obtainedMarks: number; totalMarks: number; percentage: number; passed: boolean };
+type ExamQuestion = { id: string; prompt: string; imageUrl?: string | null; optionImages?: (string | null)[]; options: string[]; marks: number; type: string };
+type ExamReviewQuestion = { questionId: string; prompt: string; imageUrl?: string | null; optionImages?: (string | null)[]; options: string[]; selectedAnswer: string | null; correctAnswer: string; isCorrect: boolean };
+type ExamResult = { obtainedMarks: number; totalMarks: number; percentage: number; passed: boolean; review: ExamReviewQuestion[] };
 type PublishedExam = { id: string; title: string; subject: string; date: string; time: string; duration: string; durationMins: number; tone: string; questions: ExamQuestion[]; fileName: string };
 
 function VideoPlayerModal({ video, onClose }: { video: VideoCard; onClose: () => void }) {
@@ -164,7 +168,9 @@ export default function Home() {
   const [contentVideos, setContentVideos] = useState<VideoCard[]>([]);
   const [contentBooks, setContentBooks] = useState<BookCard[]>([]);
   const [contentExams, setContentExams] = useState<PublishedExam[]>([]);
+  const [writtenPapers, setWrittenPapers] = useState<PublishedWrittenPaper[]>([]);
   const [authView, setAuthView] = useState<"login" | "signup">("login");
+  const [showAuthPanel, setShowAuthPanel] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [profile, setProfile] = useState<StudentProfile>({ fullName: "Student", email: "", educationLevel: "Not provided", stream: "Not provided", subjects: [] });
@@ -183,6 +189,7 @@ export default function Home() {
   const autoSubmitStarted = useRef(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [examResult, setExamResult] = useState<ExamResult | null>(null);
+  const [progressRefreshKey, setProgressRefreshKey] = useState(0);
   const [examError, setExamError] = useState("");
   const submitExamRef = useRef<() => Promise<void>>(async () => undefined);
   const [educationLevel, setEducationLevel] = useState("");
@@ -215,11 +222,13 @@ export default function Home() {
       const payload = await response.json() as ExamResult & { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "The exam could not be submitted.");
       setExamResult(payload);
+      setProgressRefreshKey((current) => current + 1);
       setExamOpen(false);
     } catch (submitError) {
       setExamError(submitError instanceof Error ? submitError.message : "The exam could not be submitted.");
     }
   }, [activeExam, answers]);
+
   useEffect(() => {
     submitExamRef.current = submitExam;
   }, [submitExam]);
@@ -370,10 +379,11 @@ export default function Home() {
   }, [router]);
 
   useEffect(() => {
-    fetch("/api/content").then((response) => response.json()).then((payload: { books?: { id: string; title: string; author: string; subject: string; level: string; price: number; coverColor: string; imageUrl: string | null }[]; videos?: { id: string; title: string; subject: string; level: string; duration: string; thumbnail: string | null; videoUrl: string }[]; exams?: { id: string; title: string; startsAt: string; durationMins: number; subject: { name: string }; questions: ExamQuestion[] }[] }) => {
+    fetch("/api/content").then((response) => response.json()).then((payload: { books?: { id: string; title: string; author: string; subject: string; level: string; price: number; coverColor: string; imageUrl: string | null }[]; videos?: { id: string; title: string; subject: string; level: string; duration: string; thumbnail: string | null; videoUrl: string }[]; exams?: { id: string; title: string; startsAt: string; durationMins: number; subject: { name: string }; questions: ExamQuestion[] }[]; writtenPapers?: PublishedWrittenPaper[] }) => {
       setContentBooks((payload.books ?? []).map((book) => ({ ...book, price: `LKR ${book.price.toLocaleString("en-LK")}`, color: book.coverColor, imageUrl: book.imageUrl ?? "" })));
       setContentVideos((payload.videos ?? []).map((video) => ({ ...video, color: "#d6e8e1", image: video.thumbnail ?? "" })));
       setContentExams((payload.exams ?? []).map((exam) => { const start = new Date(exam.startsAt); return { id: exam.id, title: exam.title, subject: exam.subject.name, date: start.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), time: start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }), duration: `${exam.durationMins} min`, durationMins: exam.durationMins, tone: "mint", questions: exam.questions, fileName: "Online exam" }; }));
+      setWrittenPapers(payload.writtenPapers ?? []);
     }).catch(() => undefined);
   }, []);
 
@@ -450,15 +460,201 @@ export default function Home() {
     setAssistantInput("");
   };
 
-  if (!authenticated) {
+if (!authenticated) {
     return (
-      <main className="auth-shell">
-        <section className="auth-story">
-          <div className="brand auth-brand"><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div>
-          <div className="story-copy"><p className="eyebrow">LEARNING, IN MOTION</p><h1>Your next breakthrough starts here.</h1><p>One focused space for Sri Lankan students to learn with purpose, practise with confidence, and see their progress clearly.</p><div className="story-note"><span>✦</span><div><strong>Built around your goals</strong><br />Personalised learning paths for every subject, stream, and stage.</div></div></div>
-          <div className="story-footer">EduSmart Sri Lanka <span>·</span> English <span>·</span> Sinhala <span>·</span> Tamil</div>
+      <main className="landing-page">
+        <nav className="landing-nav" role="navigation" aria-label="Main navigation">
+          <div className="landing-nav-container">
+            <div className="landing-nav-brand"><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div>
+            <div className="landing-nav-actions">
+              <button className="landing-btn-secondary" onClick={() => { setPortal("student"); setAuthView("login"); setShowAuthPanel(true); }}>Login</button>
+              <button className="landing-btn-primary" onClick={() => { setPortal("student"); setAuthView("signup"); setShowAuthPanel(true); }}>Register</button>
+            </div>
+          </div>
+        </nav>
+
+        <section className="landing-section landing-hero-section" aria-labelledby="hero-title">
+          <div className="landing-container">
+            <div className="landing-hero reveal">
+              <div className="landing-hero-badge animate-fade-in-up">🚀 New: AI-powered learning insights</div>
+              <h1 id="hero-title" className="landing-hero-title animate-fade-in-up delay-100">Your next breakthrough starts here.</h1>
+              <p className="landing-hero-subtitle animate-fade-in-up delay-200">One focused space for Sri Lankan students to learn with purpose, practise with confidence, and see their progress clearly.</p>
+              <div className="landing-hero-buttons animate-fade-in-up delay-300">
+                <button className="landing-btn-primary" onClick={() => { setPortal("student"); setAuthView("signup"); setShowAuthPanel(true); }}>Get Started Free</button>
+                <button className="landing-btn-secondary" onClick={() => { setPortal("student"); setAuthView("login"); setShowAuthPanel(true); }}>Login to your space</button>
+              </div>
+              <div className="landing-stats animate-fade-in-up delay-400">
+                <div className="landing-stat-item"><div className="landing-stat-value">15K+</div><div className="landing-stat-label">Active Students</div></div>
+                <div className="landing-stat-item"><div className="landing-stat-value">500+</div><div className="landing-stat-label">Practice Exams</div></div>
+                <div className="landing-stat-item"><div className="landing-stat-value">94%</div><div className="landing-stat-label">Success Rate</div></div>
+                <div className="landing-stat-item"><div className="landing-stat-value">24/7</div><div className="landing-stat-label">AI Support</div></div>
+              </div>
+            </div>
+          </div>
         </section>
-        <section className="auth-panel"><div className="auth-card"><div className="auth-card-heading"><p className="eyebrow">WELCOME BACK</p><h2>{authView === "login" ? "Sign in to your space" : "Create your student space"}</h2><p>{portal === "student" ? "Continue your learning journey." : "Manage learning and examinations securely."}</p></div><div className="portal-switch" role="tablist" aria-label="Choose portal"><button className={portal === "student" ? "selected" : ""} onClick={() => { setPortal("student"); setAuthView("login"); setAuthError(""); setAuthMessage(""); }} role="tab" aria-selected={portal === "student"}>Student portal</button><button className={portal === "admin" ? "selected" : ""} onClick={() => { setPortal("admin"); setAuthView("login"); setAuthError(""); setAuthMessage(""); }} role="tab" aria-selected={portal === "admin"}>Admin portal</button></div><form className="auth-form" onSubmit={handleAuthSubmit}>{authView === "signup" && <label>Full name<input type="text" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="e.g. Nethmi Silva" required /></label>}<label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={portal === "admin" ? "admin@school.lk" : "you@example.com"} required /></label><label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" minLength={8} required /></label>{authView === "signup" && <label>Education level<select value={educationLevel} onChange={(event) => { setEducationLevel(event.target.value); setStream(""); setSubjects([]); setSubjectError(false); }} required><option value="" disabled>Select your level</option><option>Grade 6–11</option><option>GCE Ordinary Level (O/L)</option><option>GCE Advanced Level (A/L)</option></select></label>}{authView === "signup" && educationLevel === "GCE Advanced Level (A/L)" && <div className="academic-details"><label>Advanced Level stream<select value={stream} onChange={(event) => { setStream(event.target.value); setSubjects([]); setSubjectError(false); }} required><option value="" disabled>Select your stream</option>{Object.keys(streamSubjects).map((item) => <option key={item}>{item}</option>)}</select></label>{stream && <fieldset className={subjectError ? "subjects-error" : ""}><legend>Subjects</legend><div className="subject-options">{availableSubjects.map((subject) => <label key={subject}><input type="checkbox" checked={subjects.includes(subject)} onChange={() => toggleSubject(subject)} /> {subject}</label>)}</div>{subjectError && <p className="field-error">Select at least one subject.</p>}</fieldset>}</div>}{authError && <p className="field-error">{authError}</p>}{authMessage && <p className="admin-upload-status">{authMessage}</p>}{authView === "login" && <button type="button" className="forgot-link">Forgot password?</button>}<button className="auth-submit" type="submit" disabled={authLoading}>{authView === "login" ? (authLoading ? "Signing in..." : `Sign in as ${portal === "student" ? "student" : "admin"}`) : (authLoading ? "Creating account..." : "Create student account")}<span>→</span></button></form>{portal === "student" && <div className="auth-toggle">{authView === "login" ? "New to EduSmart?" : "Already have an account?"} <button onClick={() => { setAuthView(authView === "login" ? "signup" : "login"); setAuthError(""); setAuthMessage(""); }}>{authView === "login" ? "Create an account" : "Sign in"}</button></div>}{portal === "admin" && <p className="admin-hint">Admin accounts are provisioned by your institution. Use your authorised school credentials to continue.</p>}</div><p className="auth-legal">By continuing, you agree to EduSmart&apos;s terms and privacy policy.</p></section>
+
+        <section className="landing-section" aria-labelledby="features-title">
+          <div className="landing-container">
+            <div className="reveal" style={{ textAlign: 'center', maxWidth: '600px', margin: '0 auto 48px' }}>
+              <span className="landing-hero-badge" style={{ background: 'var(--soft-green)', color: 'var(--green)' }}>Our Features</span>
+              <h2 id="features-title" style={{ font: '800 clamp(32px, 4vw, 48px) Manrope, sans-serif', marginTop: '16px', marginBottom: '12px', color: 'var(--ink)' }}>Everything you need to excel</h2>
+              <p style={{ fontSize: '18px', color: 'var(--muted)', lineHeight: 1.7 }}>Personalized learning paths, real exam practice, and AI-powered insights — all in one place.</p>
+            </div>
+            <div className="landing-features">
+              <article className="landing-feature-card reveal animate-fade-in-up delay-100">
+                <div className="landing-feature-icon" style={{ background: 'var(--soft-green)', color: 'var(--green)' }}>📚</div>
+                <h3 className="landing-feature-title">Personalized Learning Paths</h3>
+                <p className="landing-feature-desc">AI-driven recommendations adapt to your strengths, weaknesses, and exam schedule for maximum efficiency.</p>
+              </article>
+              <article className="landing-feature-card reveal animate-fade-in-up delay-200">
+                <div className="landing-feature-icon" style={{ background: '#fff3e6', color: 'var(--gold)' }}>📝</div>
+                <h3 className="landing-feature-title">Real Exam Practice</h3>
+                <p className="landing-feature-desc">Practice with authentic past papers, timed mock exams, and instant AI grading with detailed explanations.</p>
+              </article>
+              <article className="landing-feature-card reveal animate-fade-in-up delay-300">
+                <div className="landing-feature-icon" style={{ background: '#e0d4f7', color: '#8d6799' }}>📊</div>
+                <h3 className="landing-feature-title">Progress Analytics</h3>
+                <p className="landing-feature-desc">Track your improvement with detailed subject breakdowns, streak tracking, and predictive scoring.</p>
+              </article>
+              <article className="landing-feature-card reveal animate-fade-in-up delay-400">
+                <div className="landing-feature-icon" style={{ background: '#d4f4e7', color: '#2a8c73' }}>🤖</div>
+                <h3 className="landing-feature-title">AI Study Assistant</h3>
+                <p className="landing-feature-desc">Get instant help with concepts, generate practice questions, and receive personalized study plans.</p>
+              </article>
+              <article className="landing-feature-card reveal animate-fade-in-up delay-500">
+                <div className="landing-feature-icon" style={{ background: '#fce4e4', color: '#c88624' }}>🏆</div>
+                <h3 className="landing-feature-title">Gamified Progress</h3>
+                <p className="landing-feature-desc">Earn badges, maintain streaks, and compete on leaderboards to stay motivated throughout your journey.</p>
+              </article>
+              <article className="landing-feature-card reveal animate-fade-in-up delay-600">
+                <div className="landing-feature-icon" style={{ background: '#dbeafe', color: '#3b82f6' }}>📱</div>
+                <h3 className="landing-feature-title">Learn Anywhere</h3>
+                <p className="landing-feature-desc">Seamless experience across desktop, tablet, and mobile with offline sync for uninterrupted learning.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section" style={{ background: 'linear-gradient(180deg, var(--paper) 0%, #f0f7f4 100%)' }} aria-labelledby="how-title">
+          <div className="landing-container">
+            <div className="reveal" style={{ textAlign: 'center', maxWidth: '600px', margin: '0 auto 48px' }}>
+              <span className="landing-hero-badge" style={{ background: 'var(--soft-green)', color: 'var(--green)' }}>How It Works</span>
+              <h2 id="how-title" style={{ font: '800 clamp(32px, 4vw, 48px) Manrope, sans-serif', marginTop: '16px', marginBottom: '12px', color: 'var(--ink)' }}>Start learning in 3 simple steps</h2>
+            </div>
+            <div className="landing-grid landing-grid-3" style={{ gap: '32px' }}>
+              <div className="landing-card reveal animate-fade-in-up delay-100" style={{ textAlign: 'center', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '-16px', left: '50%', transform: 'translateX(-50%)', width: '32px', height: '32px', borderRadius: '50%', background: 'var(--green)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', font: '700 16px Manrope, sans-serif' }}>1</div>
+                <div className="landing-card-icon" style={{ margin: '32px auto 16px', background: 'var(--soft-green)', color: 'var(--green)' }}>✍️</div>
+                <h3 className="landing-card-title">Create Your Profile</h3>
+                <p className="landing-card-desc">Tell us your grade, stream, and subjects. Our AI builds a personalized learning plan instantly.</p>
+              </div>
+              <div className="landing-card reveal animate-fade-in-up delay-200" style={{ textAlign: 'center', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '-16px', left: '50%', transform: 'translateX(-50%)', width: '32px', height: '32px', borderRadius: '50%', background: 'var(--green)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', font: '700 16px Manrope, sans-serif' }}>2</div>
+                <div className="landing-card-icon" style={{ margin: '32px auto 16px', background: '#fff3e6', color: 'var(--gold)' }}>🎯</div>
+                <h3 className="landing-card-title">Practice & Learn</h3>
+                <p className="landing-card-desc">Access curated video lessons, practice questions, and full mock exams tailored to your syllabus.</p>
+              </div>
+              <div className="landing-card reveal animate-fade-in-up delay-300" style={{ textAlign: 'center', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '-16px', left: '50%', transform: 'translateX(-50%)', width: '32px', height: '32px', borderRadius: '50%', background: 'var(--green)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', font: '700 16px Manrope, sans-serif' }}>3</div>
+                <div className="landing-card-icon" style={{ margin: '32px auto 16px', background: '#e0d4f7', color: '#8d6799' }}>📈</div>
+                <h3 className="landing-card-title">Track & Improve</h3>
+                <p className="landing-card-desc">Watch your scores rise with AI-powered insights, weak area detection, and adaptive recommendations.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section" aria-labelledby="testimonials-title">
+          <div className="landing-container">
+            <div className="reveal" style={{ textAlign: 'center', maxWidth: '600px', margin: '0 auto 48px' }}>
+              <span className="landing-hero-badge" style={{ background: '#fff3e6', color: 'var(--gold)' }}>Trusted by Students</span>
+              <h2 id="testimonials-title" style={{ font: '800 clamp(32px, 4vw, 48px) Manrope, sans-serif', marginTop: '16px', marginBottom: '12px', color: 'var(--ink)' }}>Loved by thousands across Sri Lanka</h2>
+            </div>
+            <div className="landing-testimonials">
+              <article className="landing-testimonial reveal animate-fade-in-up delay-100">
+                <div className="landing-testimonial-stars">★★★★★</div>
+                <p className="landing-testimonial-text">"The AI study assistant helped me understand Physics vectors in days what took months in class. My grade jumped from 68% to 89%!"</p>
+                <div className="landing-testimonial-author">
+                  <div className="landing-testimonial-avatar">NT</div>
+                  <div><div className="landing-testimonial-name">Nethmi T.</div><div className="landing-testimonial-role">A/L Physics · Colombo</div></div>
+                </div>
+              </article>
+              <article className="landing-testimonial reveal animate-fade-in-up delay-200">
+                <div className="landing-testimonial-stars">★★★★★</div>
+                <p className="landing-testimonial-text">"The personalized learning path saved me so much time. I only studied what I actually needed for my O/L exams. Highly recommend!"</p>
+                <div className="landing-testimonial-author">
+                  <div className="landing-testimonial-avatar">KP</div>
+                  <div><div className="landing-testimonial-name">Kasun P.</div><div className="landing-testimonial-role">O/L Commerce · Kandy</div></div>
+                </div>
+              </article>
+              <article className="landing-testimonial reveal animate-fade-in-up delay-300">
+                <div className="landing-testimonial-stars">★★★★★</div>
+                <p className="landing-testimonial-text">"As a teacher, I recommend EduSmart to all my students. The progress tracking and AI insights make my job so much easier."</p>
+                <div className="landing-testimonial-author">
+                  <div className="landing-testimonial-avatar">RS</div>
+                  <div><div className="landing-testimonial-name">Mrs. R. Silva</div><div className="landing-testimonial-role">A/L Teacher · Galle</div></div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section" aria-labelledby="cta-title">
+          <div className="landing-container">
+            <div className="landing-cta-section reveal animate-fade-in-up">
+              <h2 id="cta-title" className="landing-cta-title">Ready to accelerate your learning?</h2>
+              <p className="landing-cta-subtitle">Join 15,000+ Sri Lankan students already using EduSmart. Start free today.</p>
+              <div className="landing-cta-buttons">
+                <button className="landing-cta-btn-primary" onClick={() => { setPortal("student"); setAuthView("signup"); setShowAuthPanel(true); }}>Create Free Account</button>
+                <button className="landing-cta-btn-secondary" onClick={() => { setPortal("student"); setAuthView("login"); setShowAuthPanel(true); }}>Login to Continue</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer className="landing-footer" role="contentinfo">
+          <div className="landing-container">
+            <div className="landing-nav-brand" style={{ justifyContent: 'center', marginBottom: '16px' }}><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div>
+            <div className="landing-footer-links">
+              <a href="#" className="landing-footer-link">About Us</a>
+              <a href="#" className="landing-footer-link">Privacy Policy</a>
+              <a href="#" className="landing-footer-link">Terms of Service</a>
+              <a href="#" className="landing-footer-link">Contact</a>
+            </div>
+            <p>© 2024 EduSmart Sri Lanka. All rights reserved.</p>
+            <p style={{ marginTop: '8px', fontSize: '12px' }}>EduSmart Sri Lanka · English · Sinhala · Tamil</p>
+          </div>
+        </footer>
+
+        {showAuthPanel && (
+          <div className="auth-modal-overlay" onClick={() => setShowAuthPanel(false)}>
+            <section className="auth-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+              <button className="auth-modal-close" onClick={() => setShowAuthPanel(false)} aria-label="Close">×</button>
+              <div className="auth-card">
+                <div className="auth-card-heading">
+                  <p className="eyebrow">WELCOME BACK</p>
+                  <h2 id="auth-modal-title">{authView === "login" ? "Sign in to your space" : "Create your student space"}</h2>
+                  <p>{portal === "student" ? "Continue your learning journey." : "Manage learning and examinations securely."}</p>
+                </div>
+                <div className="portal-switch" role="tablist" aria-label="Choose portal">
+                  <button className={portal === "student" ? "selected" : ""} onClick={() => { setPortal("student"); setAuthView("login"); setAuthError(""); setAuthMessage(""); }} role="tab" aria-selected={portal === "student"}>Student portal</button>
+                  <button className={portal === "admin" ? "selected" : ""} onClick={() => { setPortal("admin"); setAuthView("login"); setAuthError(""); setAuthMessage(""); }} role="tab" aria-selected={portal === "admin"}>Admin portal</button>
+                </div>
+                <form className="auth-form" onSubmit={handleAuthSubmit}>
+                  {authView === "signup" && <label>Full name<input type="text" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="e.g. Nethmi Silva" required /></label>}
+                  <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={portal === "admin" ? "admin@school.lk" : "you@example.com"} required /></label>
+                  <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" minLength={8} required /></label>
+                  {authView === "signup" && <label>Education level<select value={educationLevel} onChange={(event) => { setEducationLevel(event.target.value); setStream(""); setSubjects([]); setSubjectError(false); }} required><option value="" disabled>Select your level</option><option>Grade 6–11</option><option>GCE Ordinary Level (O/L)</option><option>GCE Advanced Level (A/L)</option></select></label>}
+                  {authView === "signup" && educationLevel === "GCE Advanced Level (A/L)" && <div className="academic-details"><label>Ad...</label></div>}
+                  <div className="auth-form-footer">
+                    <button type="submit" className="primary-button" style={{ width: '100%', justifyContent: 'center' }}>{authView === "login" ? "Sign In" : "Create Account"}</button>
+                  </div>
+                  <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: 'var(--muted)' }}>{authView === "login" ? "Don't have an account? " : "Already have an account? "}<button type="button" onClick={() => setAuthView(authView === "login" ? "signup" : "login")} style={{ color: 'var(--green)', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }}>{authView === "login" ? "Register" : "Login"}</button></p>
+                </form>
+              </div>
+            </section>
+          </div>
+        )}
       </main>
     );
   }
@@ -509,7 +705,8 @@ export default function Home() {
 
           {activeNav === "Examinations" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">ASSESSMENTS AND DEADLINES</p><h1>Examinations</h1><p className="subtitle">Stay prepared for every upcoming assessment.</p></div></div><div className="exam-list nav-exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.title}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="primary-button" onClick={() => openExam(exam)}>Open exam <span>→</span></button></article>)}</div></section>}
 
-          {activeNav === "Progress" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">YOUR LEARNING JOURNEY</p><h1>Progress</h1><p className="subtitle">See where your effort is turning into results.</p></div></div><div className="stats-grid"><div className="stat-card accent"><div className="stat-label">AVG. PERFORMANCE <span>↗</span></div><div className="stat-value">78<small>%</small></div><div className="stat-foot"><span className="up">↑ 6.4%</span> from last month</div></div><div className="stat-card"><div className="stat-label">LEARNING STREAK <span>↗</span></div><div className="stat-value">12 <small>days</small></div><div className="stat-foot">+3 from last week</div></div><div className="stat-card"><div className="stat-label">HOURS LEARNED <span>↗</span></div><div className="stat-value">24<small>h</small> <em>18m</em></div><div className="stat-foot">Goal: 30h this month</div></div></div><section className="progress-panel progress-page-panel"><div className="section-heading compact"><div><p className="eyebrow">SUBJECT BREAKDOWN</p><h2>Subject strengths</h2></div></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></section>}
+          {activeNav === "Examinations" && <section className="nav-page written-paper-student-list"><div className="section-heading"><div><p className="eyebrow">ESSAY AND STRUCTURED PRACTICE</p><h2>Question papers</h2><p className="subtitle">Start the exam to begin its timer, then upload your scanned answer paper before time runs out.</p></div></div>{writtenPapers.length === 0 ? <p className="admin-empty">No essay or structured question papers have been published yet.</p> : <div className="written-paper-student-grid">{writtenPapers.map((paper) => <article className="written-paper-student-card" key={paper.id}><div className="written-paper-card-top"><div><span className="subject-tag">{paper.subject} &middot; {paper.educationLevel === "GRADE" ? `Grade${paper.grade ? ` ${paper.grade}` : ""}` : paper.educationLevel === "A_LEVEL" ? "A Level" : "O Level"}{paper.stream ? ` &middot; ${paper.stream}` : ""}</span><h3>{paper.title}</h3><p>{paper.fileName}{paper.fileName.toLowerCase().endsWith(".docx") ? " · Download to open this Word document." : ""}</p></div><a className="primary-button" href={`/api/written-papers/${paper.id}/download`}>Download question paper</a></div>{paper.fileName.toLowerCase().endsWith(".pdf") && <iframe className="written-paper-preview" src={`/api/written-papers/${paper.id}/download?inline=1`} title={`${paper.title} question paper`} />}<WrittenPaperAttempt paper={paper} /></article>)}</div>}</section>}
+          {activeNav === "Progress" && <StudentProgress refreshKey={progressRefreshKey} />}
 
           {activeNav === "Book shop" && <section className="nav-page shop-page"><div className="section-heading"><div><p className="eyebrow">STUDY MATERIALS FOR YOUR JOURNEY</p><h1>Book shop</h1><p className="subtitle">Get trusted revision guides and practice papers delivered to you.</p></div><button className="basket-button" onClick={() => setBasket([])} aria-label="Clear basket">Basket <span>{basket.length}</span></button></div><div className="book-grid">{contentBooks.map((book) => { const inBasket = basket.includes(book.title); return <article className={`book-card ${book.color}`} key={book.id}><div className="book-cover" style={book.imageUrl ? { backgroundImage: `url(${book.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}><span>{book.level}</span><strong>{book.subject}</strong><i>EduSmart<br />Study Series</i></div><div className="book-copy"><div className="book-meta"><span>{book.subject}</span><span>{book.level}</span></div><h2>{book.title}</h2><p>by {book.author}</p><div className="book-purchase"><strong>{book.price}</strong><button className={inBasket ? "added-button" : "primary-button"} onClick={() => setBasket((current) => inBasket ? current.filter((title) => title !== book.title) : [...current, book.title])}>{inBasket ? "Added ✓" : "Add to basket"}</button></div></div></article>; })}</div>{basket.length > 0 && <div className="basket-bar"><div><strong>{basket.length} {basket.length === 1 ? "book" : "books"} in your basket</strong><span>Ready for checkout</span></div><button className="primary-button" onClick={() => { setBasket([]); window.alert("Your order has been placed successfully."); }}>Checkout <span>→</span></button></div>}</section>}
 
@@ -517,8 +714,8 @@ export default function Home() {
         </div>
       </section>
 
-      {examOpen && activeExam && questions[question] && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">{activeExam.subject}</span><h2 id="exam-title">{activeExam.title}</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body" tabIndex={0} aria-label="Question and answer choices"><div className="question-number">{String(question + 1).padStart(2, "0")}</div><div className="question-content"><h3>{questions[question].prompt}</h3>{questions[question].options.map((option, optionIndex) => { const key = String.fromCharCode(65 + optionIndex); return <label key={key}><input type="radio" name={`answer-${questions[question].id}`} checked={answers[questions[question].id] === key} onChange={() => setAnswers((current) => ({ ...current, [questions[question].id]: key }))} /> <span>{key}</span> {option}</label>; })}</div></div><div className="exam-modal-bottom"><span>{examError || "Submit before the timer ends to save your answers."}</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => setQuestion(question + 1)}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => void submitExam()}>Submit exam <span>✓</span></button>}</div></div></section></div>}
-      {examResult && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="result-title"><div className="exam-modal-top"><div><span className="subject-tag">EXAM RESULT</span><h2 id="result-title">{activeExam?.title}</h2></div><button className="close-button" onClick={() => setExamResult(null)} aria-label="Close result">×</button></div><div className="question-body"><div className="question-number">{Math.round(examResult.percentage)}%</div><div className="question-content"><h3>{examResult.passed ? "Congratulations, you passed." : "Keep practising and try again."}</h3><p>You scored {examResult.obtainedMarks} of {examResult.totalMarks} marks ({examResult.percentage}%).</p></div></div><div className="exam-modal-bottom"><span>Saved to your examination results.</span><button className="primary-button" onClick={() => setExamResult(null)}>Done</button></div></section></div>}
+      {examOpen && activeExam && questions[question] && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">{activeExam.subject}</span><h2 id="exam-title">{activeExam.title}</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body" tabIndex={0} aria-label="Question and answer choices"><div className="question-number">{String(question + 1).padStart(2, "0")}</div><div className="question-content"><h3>{questions[question].prompt}</h3>{questions[question].imageUrl && <img className="student-question-image" src={questions[question].imageUrl} alt={`Image for question ${question + 1}`} />}{questions[question].options.map((option, optionIndex) => { const key = String.fromCharCode(65 + optionIndex); const optionImage = questions[question].optionImages?.[optionIndex]; return <label key={key}><input type="radio" name={`answer-${questions[question].id}`} checked={answers[questions[question].id] === key} onChange={() => setAnswers((current) => ({ ...current, [questions[question].id]: key }))} /> <span>{key}</span> {option}{optionImage && <img className="student-option-image" src={optionImage} alt={`Option ${key}`} />}</label>; })}</div></div><div className="exam-modal-bottom"><span>{examError || "Submit before the timer ends to save your answers."}</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => setQuestion(question + 1)}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => void submitExam()}>Submit exam <span>✓</span></button>}</div></div></section></div>}
+      {examResult && <div className="modal-backdrop"><section className="exam-modal exam-result-modal" role="dialog" aria-modal="true" aria-labelledby="result-title"><div className="exam-modal-top"><div><span className="subject-tag">EXAM RESULT</span><h2 id="result-title">{activeExam?.title}</h2></div><button className="close-button" onClick={() => setExamResult(null)} aria-label="Close result">×</button></div><div className="question-body"><div className="question-number">{Math.round(examResult.percentage)}%</div><div className="question-content"><h3>{examResult.percentage < 70 ? `Let's strengthen ${activeExam?.subject ?? "this subject"}.` : examResult.passed ? "Congratulations, you passed." : "Keep practising and try again."}</h3><p>You scored {examResult.obtainedMarks} of {examResult.totalMarks} marks ({examResult.percentage}%). {examResult.percentage < 70 ? "Your Progress page has practice suggestions based on your scores." : "Your result is saved to your Progress page."}</p></div></div><section className="exam-review-sheet" aria-label="Exam answer review"><h3>Answer review</h3>{examResult.review.map((item, index) => { const selectedIndex = item.selectedAnswer ? item.selectedAnswer.charCodeAt(0) - 65 : -1; const correctIndex = item.correctAnswer.charCodeAt(0) - 65; return <article className="exam-review-question" key={item.questionId}><div className="exam-review-heading"><strong>Question {String(index + 1).padStart(2, "0")}</strong><span className={item.isCorrect ? "review-correct" : "review-incorrect"}>{item.isCorrect ? "Correct" : "Incorrect"}</span></div><h4>{item.prompt}</h4>{item.imageUrl && <img className="student-question-image" src={item.imageUrl} alt={`Image for question ${index + 1}`} />}<p className={item.isCorrect ? "review-correct" : "review-incorrect"}><strong>Your answer:</strong> {selectedIndex >= 0 ? `${item.selectedAnswer}: ${item.options[selectedIndex]}` : "Not answered"}</p><p className="review-correct"><strong>Correct answer:</strong> {item.correctAnswer}: {item.options[correctIndex]}</p></article>; })}</section><div className="exam-modal-bottom"><span>Saved to your examination results.</span><button className="primary-button" onClick={() => setExamResult(null)}>Done</button></div></section></div>}
       {profileOpen && <ProfileModal profile={profile} onClose={() => setProfileOpen(false)} onSignOut={async () => { setProfileOpen(false); await handleSignOut(); }} />}
       {authenticated && <div className="assistant-widget"><button className="assistant-launcher" onClick={() => setAssistantOpen((open) => !open)} aria-label={assistantOpen ? "Close EduSmart assistant" : "Open EduSmart assistant"}>{assistantOpen ? "×" : "✦"}<span className="assistant-pulse" /></button>{assistantOpen && <section className="assistant-panel" role="dialog" aria-label="EduSmart support assistant"><div className="assistant-head"><div><span className="assistant-avatar">✦</span><div><strong>EduSmart assistant</strong><small>Here to help</small></div></div><button onClick={() => setAssistantOpen(false)} aria-label="Close assistant">×</button></div><div className="assistant-messages">{assistantMessages.map((message, index) => <p className={`assistant-message ${message.from}`} key={`${message.from}-${index}`}>{message.text}</p>)}</div><div className="assistant-quick-actions"><button onClick={() => askAssistant("exams", "Show my exams")}>My exams</button><button onClick={() => askAssistant("learning", "Help with learning")}>Learning help</button><button onClick={() => askAssistant("books", "Where are the books?")}>Book shop</button></div><form className="assistant-form" onSubmit={submitAssistantMessage}><input value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Ask for support..." aria-label="Ask the assistant" /><button type="submit" aria-label="Send message">↑</button></form></section>}</div>}
     </main>

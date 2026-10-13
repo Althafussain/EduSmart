@@ -76,7 +76,23 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
 
     if (!result) return NextResponse.json({ error: "The exam result could not be created." }, { status: 500 });
-    return NextResponse.json({ obtainedMarks: result.obtainedMarks, totalMarks, percentage: result.percentage, passed: result.passed });
+    const review = exam.questions.map((question) => {
+      const options = Array.isArray(question.options) ? question.options.map(String) : [];
+      const correctAnswer = resolveOptionAnswer(question.correctAnswer, options)!;
+      const selectedAnswer = resolveOptionAnswer(answerByQuestion.get(question.id), options);
+      return {
+        questionId: question.id,
+        prompt: question.prompt,
+        imageUrl: question.imageUrl,
+        optionImages: question.optionImages,
+        options,
+        selectedAnswer,
+        correctAnswer,
+        isCorrect: selectedAnswer === correctAnswer,
+      };
+    });
+
+    return NextResponse.json({ obtainedMarks: result.obtainedMarks, totalMarks, percentage: result.percentage, passed: result.passed, review });
   } catch (error) {
     console.error("Exam submission failed:", error);
     return NextResponse.json({ error: "Your answers could not be submitted. Please try again." }, { status: 400 });

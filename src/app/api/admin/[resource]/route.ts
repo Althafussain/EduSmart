@@ -24,17 +24,21 @@ type ExamQuestionInput = {
   prompt: string;
   options: string[];
   correctAnswer: string | null;
+  imageUrl?: string | null;
+  optionImages: string[];
 };
 
 function examQuestions(value: unknown): ExamQuestionInput[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => {
-    if (typeof item === "string") return { prompt: item.trim(), options: [], correctAnswer: null };
-    const question = item as { prompt?: unknown; options?: unknown; correctAnswer?: unknown };
+    if (typeof item === "string") return { prompt: item.trim(), options: [], correctAnswer: null, imageUrl: null, optionImages: [] };
+    const question = item as { prompt?: unknown; options?: unknown; correctAnswer?: unknown; imageUrl?: unknown; optionImages?: unknown };
     return {
       prompt: String(question.prompt ?? "").trim(),
-      options: Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : [],
-      correctAnswer: resolveOptionAnswer(question.correctAnswer, Array.isArray(question.options) ? question.options.map((option) => String(option).trim()).filter(Boolean) : []),
+      options: Array.isArray(question.options) ? question.options.map((option) => String(option).trim()) : [],
+      correctAnswer: resolveOptionAnswer(question.correctAnswer, Array.isArray(question.options) ? question.options.map((option) => String(option).trim()) : []),
+      imageUrl: typeof question.imageUrl === "string" && /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(question.imageUrl) && question.imageUrl.length <= 7_000_000 ? question.imageUrl : null,
+      optionImages: Array.isArray(question.optionImages) ? question.optionImages.slice(0, 5).map((image) => typeof image === "string" && /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(image) && image.length <= 7_000_000 ? image : "") : [],
     };
   });
 }
@@ -99,10 +103,10 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     }
     const subject = await prisma.subject.upsert({ where: { name: subjectName }, update: {}, create: { name: subjectName } });
     const questions = examQuestions(body.questions);
-    if (questions.length === 0 || questions.some((question) => !question.prompt || question.options.length < 2 || !question.correctAnswer)) {
+    if (questions.length === 0 || questions.some((question) => !question.prompt || question.options.filter((option, index) => Boolean(option) || Boolean(question.optionImages[index])).length < 2 || !question.correctAnswer)) {
       return NextResponse.json({ error: "Every exam question must have a prompt, at least two options, and a correct answer that matches one of those options." }, { status: 400 });
     }
-    const exam = await prisma.exam.create({ data: { title: String(body.title).trim(), description: body.description ? String(body.description) : null, educationLevel: body.educationLevel === "A_LEVEL" || body.educationLevel === "O_LEVEL" ? body.educationLevel : "GRADE", grade: body.grade ? Number(body.grade) : null, stream: body.stream ? String(body.stream) : null, durationMins, totalMarks: questions.length, startsAt, endsAt, published: Boolean(body.published), subjectId: subject.id, questions: { create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) } }, include: { subject: true, questions: true } });
+    const exam = await prisma.exam.create({ data: { title: String(body.title).trim(), description: body.description ? String(body.description) : null, educationLevel: body.educationLevel === "A_LEVEL" || body.educationLevel === "O_LEVEL" ? body.educationLevel : "GRADE", grade: body.grade ? Number(body.grade) : null, stream: body.stream ? String(body.stream) : null, durationMins, totalMarks: questions.length, startsAt, endsAt, published: Boolean(body.published), subjectId: subject.id, questions: { create: questions.map((question) => ({ type: "MCQ", prompt: question.prompt, imageUrl: question.imageUrl, optionImages: question.optionImages, marks: 1, options: question.options, correctAnswer: question.correctAnswer })) } }, include: { subject: true, questions: true } });
     return NextResponse.json({ item: exam }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
