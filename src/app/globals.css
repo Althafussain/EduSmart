@@ -363,3 +363,24 @@ button { font: inherit; cursor: pointer; }
 @media (max-width: 600px) { .pasted-question-images img { max-width: 100%; } }
 
 .bulk-question-rich-editor { width: 100%; min-height: 175px; max-height: 420px; overflow: auto; resize: vertical; padding: 10px; border: 1px solid #cfe0e8; border-radius: 5px; color: #284a60; background: #fff; font: 400 12px/1.55 'DM Sans', sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }.bulk-question-rich-editor:focus { outline: 2px solid #9ec6b8; outline-offset: 1px; }.bulk-question-rich-editor:empty::before { content: attr(data-placeholder); color: #9aadb6; pointer-events: none; }.pasted-question-inline-image { display: block; max-width: min(100%, 760px); max-height: 460px; width: auto; height: auto; margin: 10px 0; object-fit: contain; }.paste-image-pending { display: inline-block; margin: 6px 0; color: #6c9185; font-size: 10px; font-weight: 400; }
+
+/* Quiz Exam Manager */
+.difficulty-tab { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border: 2px solid; border-radius: 8px; font: 600 13px 'DM Sans', sans-serif; cursor: pointer; transition: all 0.2s ease; }
+.difficulty-tab:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.difficulty-tab.active { color: #fff; }
+.difficulty-tab.easy { border-color: #22c55e; color: #22c55e; }
+.difficulty-tab.easy.active { background: #22c55e; color: #fff; box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4); }
+.difficulty-tab.medium { border-color: #f59e0b; color: #f59e0b; }
+.difficulty-tab.medium.active { background: #f59e0b; color: #fff; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4); }
+.difficulty-tab.hard { border-color: #ef4444; color: #ef4444; }
+.difficulty-tab.hard.active { background: #ef4444; color: #fff; box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4); }
+.difficulty-tab.normal { border-color: #3b82f6; color: #3b82f6; }
+.difficulty-tab.normal.active { background: #3b82f6; color: #fff; box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4); }
+
+.bulk-question-rich-editor { width: 100%; min-height: 150px; max-height: 300px; overflow: auto; resize: vertical; padding: 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; font: 400 13px/1.6 'DM Sans', sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; outline: none; }
+.bulk-question-rich-editor:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+.bulk-question-rich-editor:empty::before { content: attr(data-placeholder); color: #9aadb6; pointer-events: none; }
+
+/* Quiz Exam Manager specific */
+.admin-editor-fields .difficulty-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.admin-editor-fields .difficulty-tab { font-size: 12px; padding: 8px 14px; }
