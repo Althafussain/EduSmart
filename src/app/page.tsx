@@ -496,19 +496,54 @@ if (!authenticated) {
 
         <section className="landing-section landing-hero-section" aria-labelledby="hero-title">
           <div className="landing-container">
-            <div className="landing-hero">
-              <div className="landing-hero-badge animate-fade-in-up">🚀 New: AI-powered learning insights</div>
-              <h1 id="hero-title" className="landing-hero-title animate-fade-in-up delay-100">Your next breakthrough starts here.</h1>
-              <p className="landing-hero-subtitle animate-fade-in-up delay-200">One focused space for Sri Lankan students to learn with purpose, practise with confidence, and see their progress clearly.</p>
-              <div className="landing-hero-buttons animate-fade-in-up delay-300">
-                <button className="landing-btn-primary" onClick={() => { setPortal("student"); setAuthView("signup"); setShowAuthPanel(true); }}>Get Started Free</button>
-                <button className="landing-btn-secondary" onClick={() => { setPortal("student"); setAuthView("login"); setShowAuthPanel(true); }}>Login to your space</button>
+            <div className="landing-hero-grid">
+              <div className="landing-hero-content">
+                <div className="landing-hero-badge animate-fade-in-up">🚀 New: AI-powered learning insights</div>
+                <h1 id="hero-title" className="landing-hero-title animate-fade-in-up delay-100">Your next breakthrough starts here.</h1>
+                <p className="landing-hero-subtitle animate-fade-in-up delay-200">One focused space for Sri Lankan students to learn with purpose, practise with confidence, and see their progress clearly.</p>
+                <div className="landing-hero-buttons animate-fade-in-up delay-300">
+                  <button className="landing-btn-primary" onClick={() => { setPortal("student"); setAuthView("signup"); setShowAuthPanel(true); }}>Get Started Free</button>
+                  <button className="landing-btn-secondary" onClick={() => { setPortal("student"); setAuthView("login"); setShowAuthPanel(true); }}>Login to your space</button>
+                </div>
+                <div className="landing-stats animate-fade-in-up delay-400">
+                  <div className="landing-stat-item"><div className="landing-stat-value">15K+</div><div className="landing-stat-label">Active Students</div></div>
+                  <div className="landing-stat-item"><div className="landing-stat-value">500+</div><div className="landing-stat-label">Practice Exams</div></div>
+                  <div className="landing-stat-item"><div className="landing-stat-value">94%</div><div className="landing-stat-label">Success Rate</div></div>
+                  <div className="landing-stat-item"><div className="landing-stat-value">24/7</div><div className="landing-stat-label">AI Support</div></div>
+                </div>
+                <div className="landing-trust-badges animate-fade-in-up delay-500">
+                  <span>Trusted by schools across Colombo, Kandy, Galle & Jaffna</span>
+                  <div className="landing-trust-logos">
+                    <span className="trust-logo">🏫</span>
+                    <span className="trust-logo">📚</span>
+                    <span className="trust-logo">🎓</span>
+                    <span className="trust-logo">🏆</span>
+                  </div>
+                </div>
               </div>
-              <div className="landing-stats animate-fade-in-up delay-400">
-                <div className="landing-stat-item"><div className="landing-stat-value">15K+</div><div className="landing-stat-label">Active Students</div></div>
-                <div className="landing-stat-item"><div className="landing-stat-value">500+</div><div className="landing-stat-label">Practice Exams</div></div>
-                <div className="landing-stat-item"><div className="landing-stat-value">94%</div><div className="landing-stat-label">Success Rate</div></div>
-                <div className="landing-stat-item"><div className="landing-stat-value">24/7</div><div className="landing-stat-label">AI Support</div></div>
+              <div className="landing-hero-visual animate-fade-in-right delay-200">
+                <div className="hero-illustration-container">
+                  <img 
+                    src="https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=800&h=600&fit=crop" 
+                    alt="Students learning with EduSmart" 
+                    className="hero-illustration"
+                    loading="lazy"
+                  />
+                  <div className="hero-floating-cards">
+                    <div className="float-card float-card-1">
+                      <span className="float-icon">📈</span>
+                      <span>+23% avg improvement</span>
+                    </div>
+                    <div className="float-card float-card-2">
+                      <span className="float-icon">⚡</span>
+                      <span>AI-powered insights</span>
+                    </div>
+                    <div className="float-card float-card-3">
+                      <span className="float-icon">🎯</span>
+                      <span>Personalized paths</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -521,37 +556,180 @@ if (!authenticated) {
               <h2 id="features-title" style={{ font: '800 clamp(32px, 4vw, 48px) Manrope, sans-serif', marginTop: '16px', marginBottom: '12px', color: 'var(--ink)' }}>Everything you need to excel</h2>
               <p style={{ fontSize: '18px', color: 'var(--muted)', lineHeight: 1.7 }}>Personalized learning paths, real exam practice, and AI-powered insights — all in one place.</p>
             </div>
-            <div className="landing-features">
-              <article className="landing-feature-card reveal animate-fade-in-up delay-100">
-                <div className="landing-feature-icon" style={{ background: 'var(--soft-green)', color: 'var(--green)' }}>📚</div>
-                <h3 className="landing-feature-title">Personalized Learning Paths</h3>
-                <p className="landing-feature-desc">AI-driven recommendations adapt to your strengths, weaknesses, and exam schedule for maximum efficiency.</p>
+            <div className="landing-features-grid">
+              <article className="landing-feature-card-full reveal animate-fade-in-up delay-100">
+                <div className="feature-visual" style={{ background: 'linear-gradient(135deg, var(--soft-green) 0%, #d4f4e7 100%)' }}>
+                  <img 
+                    src="https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=500&h=350&fit=crop" 
+                    alt="Personalized learning path dashboard" 
+                    className="feature-image"
+                    loading="lazy"
+                  />
+                  <div className="feature-badge">🎯 Personalized</div>
+                </div>
+                <div className="feature-content">
+                  <div className="feature-icon" style={{ background: 'var(--soft-green)', color: 'var(--green)' }}>📚</div>
+                  <h3 className="landing-feature-title">Personalized Learning Paths</h3>
+                  <p className="landing-feature-desc">AI-driven recommendations adapt to your strengths, weaknesses, and exam schedule for maximum efficiency.</p>
+                  <ul className="feature-highlights">
+                    <li>📋 Adaptive curriculum</li>
+                    <li>📅 Smart scheduling</li>
+                    <li>🎯 Weakness targeting</li>
+                  </ul>
+                </div>
               </article>
-              <article className="landing-feature-card reveal animate-fade-in-up delay-200">
-                <div className="landing-feature-icon" style={{ background: '#fff3e6', color: 'var(--gold)' }}>📝</div>
-                <h3 className="landing-feature-title">Real Exam Practice</h3>
-                <p className="landing-feature-desc">Practice with authentic past papers, timed mock exams, and instant AI grading with detailed explanations.</p>
+              <article className="landing-feature-card-full reveal animate-fade-in-up delay-200">
+                <div className="feature-visual" style={{ background: 'linear-gradient(135deg, #fff3e6 0%, #ffe8cc 100%)' }}>
+                  <img 
+                    src="https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=500&h=350&fit=crop" 
+                    alt="Real exam practice interface" 
+                    className="feature-image"
+                    loading="lazy"
+                  />
+                  <div className="feature-badge">📝 Practice</div>
+                </div>
+                <div className="feature-content">
+                  <div className="feature-icon" style={{ background: '#fff3e6', color: 'var(--gold)' }}>📝</div>
+                  <h3 className="landing-feature-title">Real Exam Practice</h3>
+                  <p className="landing-feature-desc">Practice with authentic past papers, timed mock exams, and instant AI grading with detailed explanations.</p>
+                  <ul className="feature-highlights">
+                    <li>📄 Past paper library</li>
+                    <li>⏱️ Timed mock exams</li>
+                    <li>🤖 AI auto-grading</li>
+                  </ul>
+                </div>
               </article>
-              <article className="landing-feature-card reveal animate-fade-in-up delay-300">
-                <div className="landing-feature-icon" style={{ background: '#e0d4f7', color: '#8d6799' }}>📊</div>
-                <h3 className="landing-feature-title">Progress Analytics</h3>
-                <p className="landing-feature-desc">Track your improvement with detailed subject breakdowns, streak tracking, and predictive scoring.</p>
+              <article className="landing-feature-card-full reveal animate-fade-in-up delay-300">
+                <div className="feature-visual" style={{ background: 'linear-gradient(135deg, #e0d4f7 0%, #d4c4f0 100%)' }}>
+                  <img 
+                    src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500&h=350&fit=crop" 
+                    alt="Progress analytics dashboard" 
+                    className="feature-image"
+                    loading="lazy"
+                  />
+                  <div className="feature-badge">📊 Analytics</div>
+                </div>
+                <div className="feature-content">
+                  <div className="feature-icon" style={{ background: '#e0d4f7', color: '#8d6799' }}>📊</div>
+                  <h3 className="landing-feature-title">Progress Analytics</h3>
+                  <p className="landing-feature-desc">Track your improvement with detailed subject breakdowns, streak tracking, and predictive scoring.</p>
+                  <ul className="feature-highlights">
+                    <li>📈 Subject breakdowns</li>
+                    <li>🔥 Streak tracking</li>
+                    <li>🔮 Predictive scoring</li>
+                  </ul>
+                </div>
               </article>
-              <article className="landing-feature-card reveal animate-fade-in-up delay-400">
-                <div className="landing-feature-icon" style={{ background: '#d4f4e7', color: '#2a8c73' }}>🤖</div>
-                <h3 className="landing-feature-title">AI Study Assistant</h3>
-                <p className="landing-feature-desc">Get instant help with concepts, generate practice questions, and receive personalized study plans.</p>
+              <article className="landing-feature-card-full reveal animate-fade-in-up delay-400">
+                <div className="feature-visual" style={{ background: 'linear-gradient(135deg, #d4f4e7 0%, #b8e8d0 100%)' }}>
+                  <img 
+                    src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=500&h=350&fit=crop" 
+                    alt="AI study assistant chat interface" 
+                    className="feature-image"
+                    loading="lazy"
+                  />
+                  <div className="feature-badge">🤖 AI Assistant</div>
+                </div>
+                <div className="feature-content">
+                  <div className="feature-icon" style={{ background: '#d4f4e7', color: '#2a8c73' }}>🤖</div>
+                  <h3 className="landing-feature-title">AI Study Assistant</h3>
+                  <p className="landing-feature-desc">Get instant help with concepts, generate practice questions, and receive personalized study plans.</p>
+                  <ul className="feature-highlights">
+                    <li>💬 Instant explanations</li>
+                    <li>❓ Practice generation</li>
+                    <li>📋 Study planning</li>
+                  </ul>
+                </div>
               </article>
-              <article className="landing-feature-card reveal animate-fade-in-up delay-500">
-                <div className="landing-feature-icon" style={{ background: '#fce4e4', color: '#c88624' }}>🏆</div>
-                <h3 className="landing-feature-title">Gamified Progress</h3>
-                <p className="landing-feature-desc">Earn badges, maintain streaks, and compete on leaderboards to stay motivated throughout your journey.</p>
+              <article className="landing-feature-card-full reveal animate-fade-in-up delay-500">
+                <div className="feature-visual" style={{ background: 'linear-gradient(135deg, #fce4e4 0%, #f8d0d0 100%)' }}>
+                  <img 
+                    src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=500&h=350&fit=crop" 
+                    alt="Gamified learning progress" 
+                    className="feature-image"
+                    loading="lazy"
+                  />
+                  <div className="feature-badge">🏆 Gamified</div>
+                </div>
+                <div className="feature-content">
+                  <div className="feature-icon" style={{ background: '#fce4e4', color: '#c88624' }}>🏆</div>
+                  <h3 className="landing-feature-title">Gamified Progress</h3>
+                  <p className="landing-feature-desc">Earn badges, maintain streaks, and compete on leaderboards to stay motivated throughout your journey.</p>
+                  <ul className="feature-highlights">
+                    <li>🏅 Achievement badges</li>
+                    <li>🔥 Daily streaks</li>
+                    <li>🏆 Leaderboards</li>
+                  </ul>
+                </div>
               </article>
-              <article className="landing-feature-card reveal animate-fade-in-up delay-600">
-                <div className="landing-feature-icon" style={{ background: '#dbeafe', color: '#3b82f6' }}>📱</div>
-                <h3 className="landing-feature-title">Learn Anywhere</h3>
-                <p className="landing-feature-desc">Seamless experience across desktop, tablet, and mobile with offline sync for uninterrupted learning.</p>
+              <article className="landing-feature-card-full reveal animate-fade-in-up delay-600">
+                <div className="feature-visual" style={{ background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' }}>
+                  <img 
+                    src="https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=500&h=350&fit=crop" 
+                    alt="Mobile learning experience" 
+                    className="feature-image"
+                    loading="lazy"
+                  />
+                  <div className="feature-badge">📱 Mobile</div>
+                </div>
+                <div className="feature-content">
+                  <div className="feature-icon" style={{ background: '#dbeafe', color: '#3b82f6' }}>📱</div>
+                  <h3 className="landing-feature-title">Learn Anywhere</h3>
+                  <p className="landing-feature-desc">Seamless experience across desktop, tablet, and mobile with offline sync for uninterrupted learning.</p>
+                  <ul className="feature-highlights">
+                    <li>📱 Mobile optimized</li>
+                    <li>💾 Offline sync</li>
+                    <li>☁️ Cloud backup</li>
+                  </ul>
+                </div>
               </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section" style={{ background: 'linear-gradient(180deg, var(--paper) 0%, #f8faf8 100%)' }} aria-labelledby="demo-title">
+          <div className="landing-container">
+            <div className="reveal" style={{ textAlign: 'center', maxWidth: '600px', margin: '0 auto 48px' }}>
+              <span className="landing-hero-badge" style={{ background: '#dbeafe', color: '#3b82f6' }}>Video Demo</span>
+              <h2 id="demo-title" style={{ font: '800 clamp(32px, 4vw, 48px) Manrope, sans-serif', marginTop: '16px', marginBottom: '12px', color: 'var(--ink)' }}>See EduSmart in action</h2>
+              <p style={{ fontSize: '18px', color: 'var(--muted)', lineHeight: 1.7 }}>Watch how students across Sri Lanka are transforming their learning experience.</p>
+            </div>
+            <div className="landing-video-demo reveal animate-fade-in-up">
+              <div className="video-player-wrapper">
+                <div className="video-thumbnail" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=1200&h=675&fit=crop)' }}>
+                  <button className="video-play-btn" aria-label="Play demo video">
+                    <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="32" fill="var(--green)"/><path d="M26 22l16 10-16 10z" fill="white"/></svg>
+                  </button>
+                  <div className="video-duration">3:42</div>
+                </div>
+                <div className="video-info">
+                  <h3>EduSmart Platform Walkthrough</h3>
+                  <p>Complete platform tour showing personalized learning, AI assistant, exam practice, and progress tracking.</p>
+                  <div className="video-stats">
+                    <span>👁️ 125K+ views</span>
+                    <span>⭐ 4.9/5 rating</span>
+                    <span>🇱🇰 Sri Lanka</span>
+                  </div>
+                </div>
+              </div>
+              <div className="video-features">
+                <div className="video-feature-item">
+                  <span className="video-feature-icon">🎬</span>
+                  <span>HD walkthrough</span>
+                </div>
+                <div className="video-feature-item">
+                  <span className="video-feature-icon">🇱🇰</span>
+                  <span>Sinhala/Tamil subtitles</span>
+                </div>
+                <div className="video-feature-item">
+                  <span className="video-feature-icon">📱</span>
+                  <span>Mobile friendly</span>
+                </div>
+                <div className="video-feature-item">
+                  <span className="video-feature-icon">🔄</span>
+                  <span>Always updated</span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
