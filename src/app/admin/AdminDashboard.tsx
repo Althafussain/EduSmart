@@ -176,7 +176,7 @@ export default function AdminDashboard({ onSignOut, adminName }: { onSignOut: ()
           setLoading(false);
           return;
         }
-        payload.questions = examQuestions.map((question, index) => ({
+        payload.questions = examQuestions.map((question) => ({
           ...question,
           prompt: question.prompt.trim(),
           options: question.options.map((option) => option.trim()),

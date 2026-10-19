@@ -17,6 +17,28 @@ interface QuizFormData {
   difficultyDistribution: Record<DifficultyMode, number>;
 }
 
+type QuizAttempt = {
+  id: string;
+  status: "IN_PROGRESS" | "SUBMITTED" | "EXPIRED";
+  startedAt: string;
+  submittedAt: string | null;
+  expiresAt: string;
+  user: { id: string; fullName: string; email: string };
+  result: { obtainedMarks: number; totalMarks: number | null; percentage: number; passed: boolean } | null;
+  isHistory: boolean;
+};
+
+type PublishedQuiz = {
+  id: string;
+  title: string;
+  subject: { name: string };
+  startsAt: string;
+  endsAt: string;
+  durationMins: number;
+  questions: { id: string }[];
+  attempts: QuizAttempt[];
+};
+
 const difficultyModes: { value: DifficultyMode; label: string; color: string; description: string }[] = [
   { value: "easy", label: "Easy", color: "#22c55e", description: "Basic recall and understanding questions" },
   { value: "medium", label: "Medium", color: "#f59e0b", description: "Application and analysis questions" },
@@ -60,17 +82,41 @@ export default function QuizExamManager() {
   const [pastedText, setPastedText] = useState("");
   const [pasteMessage, setPasteMessage] = useState("");
   const [pasteError, setPasteError] = useState("");
+  const [publishedQuizzes, setPublishedQuizzes] = useState<PublishedQuiz[]>([]);
+  const [viewingAttempts, setViewingAttempts] = useState<string | null>(null);
+  const [reattemptingAttemptId, setReattemptingAttemptId] = useState<string | null>(null);
   const pasteBoxRef = useRef<HTMLDivElement>(null);
 
   const totalQuestions = Object.values(quizQuestions).flat().length;
 
   async function loadQuizzes() {
     try {
-      const response = await fetch("/api/admin/exams?type=quiz");
-      const result = await response.json();
+      const response = await fetch("/api/admin/quizzes");
+      const result = await response.json() as { items?: PublishedQuiz[]; error?: string };
       if (!response.ok) throw new Error(result.error ?? "Could not load quizzes.");
-    } catch {
-      setError("Could not load quizzes.");
+      setPublishedQuizzes(result.items ?? []);
+      setError("");
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Could not load quizzes.");
+    }
+  }
+
+  async function allowReattempt(quiz: PublishedQuiz, attempt: QuizAttempt) {
+    if (!window.confirm(`Allow ${attempt.user.fullName} to take "${quiz.title}" again? Their current attempt will be archived so its marks and timestamps remain available.`)) return;
+
+    setReattemptingAttemptId(attempt.id);
+    setError("");
+    setStatus("");
+    try {
+      const response = await fetch(`/api/admin/quizzes/${quiz.id}/attempts/${attempt.id}/reattempt`, { method: "POST" });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Could not allow another attempt.");
+      setStatus(`${attempt.user.fullName} can now take "${quiz.title}" again. Their previous attempt is preserved in the history.`);
+      await loadQuizzes();
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : "Could not allow another attempt. Check your connection and try again.");
+    } finally {
+      setReattemptingAttemptId(null);
     }
   }
 
@@ -83,7 +129,6 @@ export default function QuizExamManager() {
 
   function openCreate() {
     setActiveQuizTab("create");
-    setEditingQuiz(null);
     setQuizForm({
       title: "",
       subject: "",
@@ -96,6 +141,10 @@ export default function QuizExamManager() {
     setQuizQuestions({ easy: [], medium: [], hard: [], normal: [] });
     setActiveDifficulty("easy");
     setQuizFile(null);
+    setPastedText("");
+    setPasteMessage("");
+    setPasteError("");
+    if (pasteBoxRef.current) pasteBoxRef.current.textContent = "";
     setStatus("");
     setError("");
   }
@@ -211,6 +260,7 @@ export default function QuizExamManager() {
     setQuizQuestions((current) => ({ ...current, [activeDifficulty]: [...current[activeDifficulty], ...questions] }));
     setQuizForm((current) => ({ ...current, difficultyDistribution: { ...current.difficultyDistribution, [activeDifficulty]: current.difficultyDistribution[activeDifficulty] + questions.length } }));
     setPastedText("");
+    if (pasteBoxRef.current) pasteBoxRef.current.textContent = "";
     setPasteMessage(`Added ${questions.length} questions to ${activeDifficulty} mode.`);
     setPasteError("");
   }
@@ -259,7 +309,56 @@ export default function QuizExamManager() {
           <div className="admin-actions">
             <button className="primary-button" onClick={openCreate}>+ Create Quiz</button>
           </div>
-          <p className="admin-empty">Quiz list view — implement API to load existing quizzes.</p>
+          {status && <p className="admin-upload-status" role="status">{status}</p>}
+          {error && <p className="admin-upload-error" role="alert">{error}</p>}
+          {publishedQuizzes.length === 0
+            ? <p className="admin-empty">No quiz exams have been published yet.</p>
+            : <div className="admin-record-list">{publishedQuizzes.map((quiz) => (
+              <div key={quiz.id}>
+                <article className="admin-record">
+                  <div>
+                    <strong>{quiz.title}</strong>
+                    <small>{quiz.subject.name} · {quiz.questions.length} questions · {quiz.durationMins} minutes · {quiz.attempts.length} student attempts</small>
+                  </div>
+                  <div className="admin-record-actions">
+                    <button type="button" onClick={() => setViewingAttempts(viewingAttempts === quiz.id ? null : quiz.id)}>
+                      {viewingAttempts === quiz.id ? "Hide students" : "View students & marks"}
+                    </button>
+                  </div>
+                </article>
+                {viewingAttempts === quiz.id && <div className="admin-results">
+                  <div className="admin-results-summary">
+                    <strong>{quiz.attempts.length} student{quiz.attempts.length === 1 ? "" : "s"} attempted</strong>
+                    <span>{quiz.attempts.filter((attempt) => attempt.result).length} submitted · {quiz.attempts.filter((attempt) => attempt.status === "IN_PROGRESS").length} in progress</span>
+                  </div>
+                  {quiz.attempts.length === 0
+                    ? <p className="admin-empty">No students have started this quiz.</p>
+                    : <div className="admin-results-table-wrap"><table className="admin-results-table">
+                      <thead><tr><th>Student</th><th>Email</th><th>Status</th><th>Started</th><th>Submitted</th><th>Marks</th><th>Score</th><th>Admin action</th></tr></thead>
+                      <tbody>{quiz.attempts.map((attempt) => {
+                        const inProgress = attempt.status === "IN_PROGRESS";
+                        const result = attempt.result;
+                        return <tr key={attempt.id}>
+                          <td>{attempt.user.fullName}</td>
+                          <td>{attempt.user.email}</td>
+                          <td>{result ? result.passed ? "Passed" : "Submitted" : inProgress ? "In progress" : "Expired"}</td>
+                          <td>{new Date(attempt.startedAt).toLocaleString()}</td>
+                          <td>{attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString() : "—"}</td>
+                          <td>{result ? `${result.obtainedMarks} / ${result.totalMarks ?? quiz.questions.length}` : "Pending"}</td>
+                          <td>{result ? `${result.percentage.toFixed(1)}%` : "—"}</td>
+                          <td>{attempt.isHistory ? <span>Previous attempt</span> : <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={inProgress || reattemptingAttemptId === attempt.id}
+                            title={inProgress ? "The student must finish or run out of time first." : undefined}
+                            onClick={() => void allowReattempt(quiz, attempt)}
+                          >{reattemptingAttemptId === attempt.id ? "Resetting..." : "Allow reattempt"}</button>}</td>
+                        </tr>;
+                      })}</tbody>
+                    </table></div>}
+                </div>}
+              </div>
+            ))}</div>}
         </>
       )}
 
@@ -346,9 +445,9 @@ export default function QuizExamManager() {
 
               <label className="bulk-question-paste" style={{ gridColumn: "1 / -1" }}>
                 Paste Questions
-                <div ref={pasteBoxRef} className="bulk-question-rich-editor" contentEditable={!processingImage} suppressContentEditableWarning role="textbox" aria-label="Paste questions" aria-multiline="true" data-placeholder="Paste questions here. Format: 1. Question\nA) Option A\nB) Option B\nAnswer: A" onPaste={(e) => { /* handled by rich editor */ }} />
+                <div ref={pasteBoxRef} className="bulk-question-rich-editor" contentEditable suppressContentEditableWarning role="textbox" aria-label="Paste questions" aria-multiline="true" data-placeholder="Paste questions here. Format: 1. Question\nA) Option A\nB) Option B\nAnswer: A" onInput={(event) => setPastedText(event.currentTarget.innerText)} />
                 <small>Paste questions in format: 1. Question text\nA) Option A\nB) Option B\nC) Option C\nD) Option D\nAnswer: A</small>
-                <button type="button" className="secondary-button" onClick={processPastedQuestions} disabled={processingImage || !pastedText.trim()}>{processingImage ? "Processing..." : "Add Pasted Questions"}</button>
+                <button type="button" className="secondary-button" onClick={processPastedQuestions} disabled={!pastedText.trim()}>Add Pasted Questions</button>
                 {pasteError && <p className="admin-upload-error" style={{ marginTop: 8 }}>{pasteError}</p>}
                 {pasteMessage && <p className="admin-upload-status" style={{ marginTop: 8 }}>{pasteMessage}</p>}
               </label>

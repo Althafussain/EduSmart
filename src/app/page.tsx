@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import ExamQuestionEditor from "./admin/ExamQuestionEditor";
@@ -53,7 +54,25 @@ const pageTranslationRows = [
 type ExamQuestion = { id: string; prompt: string; imageUrl?: string | null; optionImages?: (string | null)[]; options: string[]; marks: number; type: string };
 type ExamReviewQuestion = { questionId: string; prompt: string; imageUrl?: string | null; optionImages?: (string | null)[]; options: string[]; selectedAnswer: string | null; correctAnswer: string; isCorrect: boolean };
 type ExamResult = { obtainedMarks: number; totalMarks: number; percentage: number; passed: boolean; review: ExamReviewQuestion[] };
-type PublishedExam = { id: string; title: string; subject: string; date: string; time: string; duration: string; durationMins: number; tone: string; questions: ExamQuestion[]; fileName: string };
+type ContentExam = { id: string; title: string; startsAt: string; durationMins: number; isQuiz?: boolean; subject: { name: string }; questions: ExamQuestion[] };
+type PublishedExam = { id: string; title: string; subject: string; date: string; time: string; duration: string; durationMins: number; tone: string; questions: ExamQuestion[]; fileName: string; isQuiz: boolean };
+
+function mapContentExam(exam: ContentExam): PublishedExam {
+  const start = new Date(exam.startsAt);
+  return {
+    id: exam.id,
+    title: exam.title,
+    subject: exam.subject.name,
+    date: start.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+    time: start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+    duration: `${exam.durationMins} min`,
+    durationMins: exam.durationMins,
+    tone: "mint",
+    questions: exam.questions,
+    fileName: "Online exam",
+    isQuiz: exam.isQuiz ?? false,
+  };
+}
 
 function VideoPlayerModal({ video, onClose }: { video: VideoCard; onClose: () => void }) {
   return <div className="modal-backdrop" onClick={onClose}><section className="video-player-modal" role="dialog" aria-modal="true" aria-labelledby="video-player-title" onClick={(event) => event.stopPropagation()}><div className="video-player-head"><div><span className="eyebrow">NOW PLAYING · {video.subject}</span><h2 id="video-player-title">{video.title}</h2></div><button className="close-button" onClick={onClose} aria-label="Close video player">×</button></div><video className="video-player" controls autoPlay playsInline poster={video.image} src={video.videoUrl}>Your browser does not support video playback.</video><div className="video-player-foot"><span>{video.level}</span><span>{video.duration} lesson</span></div></section></div>;
@@ -168,6 +187,7 @@ export default function Home() {
   const [contentVideos, setContentVideos] = useState<VideoCard[]>([]);
   const [contentBooks, setContentBooks] = useState<BookCard[]>([]);
   const [contentExams, setContentExams] = useState<PublishedExam[]>([]);
+  const [contentError, setContentError] = useState("");
   const [writtenPapers, setWrittenPapers] = useState<PublishedWrittenPaper[]>([]);
   const [authView, setAuthView] = useState<"login" | "signup">("login");
   const [showAuthPanel, setShowAuthPanel] = useState(false);
@@ -210,6 +230,8 @@ export default function Home() {
   const activeExam = publishedExam ?? contentExams.find((exam) => exam.id === activeExamId) ?? contentExams[0] ?? null;
   const questions = activeExam?.questions ?? [];
   const exams = publishedExam ? [publishedExam, ...contentExams] : contentExams;
+  const quizExams = exams.filter((exam) => exam.isQuiz);
+  const scheduledExams = exams.filter((exam) => !exam.isQuiz);
   const languageOptions = ["English", "සිංහල", "தமிழ்"];
   const currentPortal = userRole === "admin" ? "admin" : "student";
   const cycleLanguage = () => setLanguage((current) => languageOptions[(languageOptions.indexOf(current) + 1) % languageOptions.length]);
@@ -375,11 +397,14 @@ export default function Home() {
         updateProfileFromUser(payload.user);
         if (payload.user.role === "admin") router.replace("/admin");
       }
-    });
+    }).catch(() => undefined);
   }, [router]);
 
   useEffect(() => {
-    fetch("/api/content").then((response) => response.json()).then((payload: { books?: { id: string; title: string; author: string; subject: string; level: string; price: number; coverColor: string; imageUrl: string | null }[]; videos?: { id: string; title: string; subject: string; level: string; duration: string; thumbnail: string | null; videoUrl: string }[]; exams?: { id: string; title: string; startsAt: string; durationMins: number; subject: { name: string }; questions: ExamQuestion[] }[]; writtenPapers?: PublishedWrittenPaper[] }) => {
+    fetch("/api/content").then((response) => {
+      if (!response.ok) throw new Error("Published content could not be loaded.");
+      return response.json();
+    }).then((payload: { books?: { id: string; title: string; author: string; subject: string; level: string; price: number; coverColor: string; imageUrl: string | null }[]; videos?: { id: string; title: string; subject: string; level: string; duration: string; thumbnail: string | null; videoUrl: string }[]; exams?: ContentExam[]; writtenPapers?: PublishedWrittenPaper[] }) => {
       const bookPlaceholders = [
         "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=600&fit=crop",
         "https://images.unsplash.com/photo-1589829085413-56de8ae18c73?w=400&h=600&fit=crop",
@@ -398,10 +423,32 @@ export default function Home() {
       ];
       setContentBooks((payload.books ?? []).map((book, idx) => ({ ...book, price: `LKR ${book.price.toLocaleString("en-LK")}`, color: book.coverColor, imageUrl: book.imageUrl && book.imageUrl.trim() ? book.imageUrl : bookPlaceholders[idx % bookPlaceholders.length] })));
       setContentVideos((payload.videos ?? []).map((video, idx) => ({ ...video, color: "#d6e8e1", image: video.thumbnail && video.thumbnail.trim() ? video.thumbnail : videoPlaceholders[idx % videoPlaceholders.length] })));
-      setContentExams((payload.exams ?? []).map((exam) => { const start = new Date(exam.startsAt); return { id: exam.id, title: exam.title, subject: exam.subject.name, date: start.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), time: start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }), duration: `${exam.durationMins} min`, durationMins: exam.durationMins, tone: "mint", questions: exam.questions, fileName: "Online exam" }; }));
+      setContentExams((payload.exams ?? []).map(mapContentExam));
       setWrittenPapers(payload.writtenPapers ?? []);
-    }).catch(() => undefined);
+      setContentError("");
+    }).catch((loadError: unknown) => {
+      console.error("Published student content could not be loaded:", loadError);
+      setContentError("Published content could not be loaded. Refresh the page to try again.");
+    });
   }, []);
+
+  useEffect(() => {
+    if (activeNav !== "Examinations") return;
+    let current = true;
+    fetch("/api/content", { cache: "no-store" }).then((response) => {
+      if (!response.ok) throw new Error("Published exams could not be refreshed.");
+      return response.json() as Promise<{ exams?: ContentExam[] }>;
+    }).then((payload) => {
+      if (!current) return;
+      setContentExams((payload.exams ?? []).map(mapContentExam));
+      setContentError("");
+    }).catch((loadError: unknown) => {
+      if (!current) return;
+      console.error("Published exams could not be refreshed:", loadError);
+      setContentError("Published exams could not be refreshed. Try again in a moment.");
+    });
+    return () => { current = false; };
+  }, [activeNav]);
 
   useEffect(() => {
     if (attemptDeadline === null || autoSubmitStarted.current) return;
@@ -523,11 +570,14 @@ if (!authenticated) {
               </div>
               <div className="landing-hero-visual animate-fade-in-right delay-200">
                 <div className="hero-illustration-container">
-                  <img 
+                  <Image
                     src="https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=800&h=600&fit=crop" 
+                    width={800}
+                    height={600}
+                    sizes="(max-width: 768px) 100vw, 580px"
                     alt="Students learning with EduSmart" 
                     className="hero-illustration"
-                    loading="lazy"
+                    loading="eager"
                   />
                   <div className="hero-floating-cards">
                     <div className="float-card float-card-1">
@@ -559,8 +609,11 @@ if (!authenticated) {
             <div className="landing-features-grid">
               <article className="landing-feature-card-full reveal animate-fade-in-up delay-100">
                 <div className="feature-visual" style={{ background: 'linear-gradient(135deg, var(--soft-green) 0%, #d4f4e7 100%)' }}>
-                  <img 
+                  <Image
                     src="https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=500&h=350&fit=crop" 
+                    width={500}
+                    height={350}
+                    sizes="(max-width: 768px) 100vw, 500px"
                     alt="Personalized learning path dashboard" 
                     className="feature-image"
                     loading="lazy"
@@ -580,8 +633,11 @@ if (!authenticated) {
               </article>
               <article className="landing-feature-card-full reveal animate-fade-in-up delay-200">
                 <div className="feature-visual" style={{ background: 'linear-gradient(135deg, #fff3e6 0%, #ffe8cc 100%)' }}>
-                  <img 
+                  <Image
                     src="https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=500&h=350&fit=crop" 
+                    width={500}
+                    height={350}
+                    sizes="(max-width: 768px) 100vw, 500px"
                     alt="Real exam practice interface" 
                     className="feature-image"
                     loading="lazy"
@@ -601,8 +657,11 @@ if (!authenticated) {
               </article>
               <article className="landing-feature-card-full reveal animate-fade-in-up delay-300">
                 <div className="feature-visual" style={{ background: 'linear-gradient(135deg, #e0d4f7 0%, #d4c4f0 100%)' }}>
-                  <img 
+                  <Image
                     src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500&h=350&fit=crop" 
+                    width={500}
+                    height={350}
+                    sizes="(max-width: 768px) 100vw, 500px"
                     alt="Progress analytics dashboard" 
                     className="feature-image"
                     loading="lazy"
@@ -622,8 +681,11 @@ if (!authenticated) {
               </article>
               <article className="landing-feature-card-full reveal animate-fade-in-up delay-400">
                 <div className="feature-visual" style={{ background: 'linear-gradient(135deg, #d4f4e7 0%, #b8e8d0 100%)' }}>
-                  <img 
+                  <Image
                     src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=500&h=350&fit=crop" 
+                    width={500}
+                    height={350}
+                    sizes="(max-width: 768px) 100vw, 500px"
                     alt="AI study assistant chat interface" 
                     className="feature-image"
                     loading="lazy"
@@ -643,8 +705,11 @@ if (!authenticated) {
               </article>
               <article className="landing-feature-card-full reveal animate-fade-in-up delay-500">
                 <div className="feature-visual" style={{ background: 'linear-gradient(135deg, #fce4e4 0%, #f8d0d0 100%)' }}>
-                  <img 
+                  <Image
                     src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=500&h=350&fit=crop" 
+                    width={500}
+                    height={350}
+                    sizes="(max-width: 768px) 100vw, 500px"
                     alt="Gamified learning progress" 
                     className="feature-image"
                     loading="lazy"
@@ -664,8 +729,11 @@ if (!authenticated) {
               </article>
               <article className="landing-feature-card-full reveal animate-fade-in-up delay-600">
                 <div className="feature-visual" style={{ background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' }}>
-                  <img 
+                  <Image
                     src="https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=500&h=350&fit=crop" 
+                    width={500}
+                    height={350}
+                    sizes="(max-width: 768px) 100vw, 500px"
                     alt="Mobile learning experience" 
                     className="feature-image"
                     loading="lazy"
@@ -772,7 +840,7 @@ if (!authenticated) {
             <div className="landing-testimonials">
               <article className="landing-testimonial reveal animate-fade-in-up delay-100">
                 <div className="landing-testimonial-stars">★★★★★</div>
-                <p className="landing-testimonial-text">"The AI study assistant helped me understand Physics vectors in days what took months in class. My grade jumped from 68% to 89%!"</p>
+                <p className="landing-testimonial-text">&ldquo;The AI study assistant helped me understand Physics vectors in days what took months in class. My grade jumped from 68% to 89%!&rdquo;</p>
                 <div className="landing-testimonial-author">
                   <div className="landing-testimonial-avatar">NT</div>
                   <div><div className="landing-testimonial-name">Nethmi T.</div><div className="landing-testimonial-role">A/L Physics · Colombo</div></div>
@@ -780,7 +848,7 @@ if (!authenticated) {
               </article>
               <article className="landing-testimonial reveal animate-fade-in-up delay-200">
                 <div className="landing-testimonial-stars">★★★★★</div>
-                <p className="landing-testimonial-text">"The personalized learning path saved me so much time. I only studied what I actually needed for my O/L exams. Highly recommend!"</p>
+                <p className="landing-testimonial-text">&ldquo;The personalized learning path saved me so much time. I only studied what I actually needed for my O/L exams. Highly recommend!&rdquo;</p>
                 <div className="landing-testimonial-author">
                   <div className="landing-testimonial-avatar">KP</div>
                   <div><div className="landing-testimonial-name">Kasun P.</div><div className="landing-testimonial-role">O/L Commerce · Kandy</div></div>
@@ -788,7 +856,7 @@ if (!authenticated) {
               </article>
               <article className="landing-testimonial reveal animate-fade-in-up delay-300">
                 <div className="landing-testimonial-stars">★★★★★</div>
-                <p className="landing-testimonial-text">"As a teacher, I recommend EduSmart to all my students. The progress tracking and AI insights make my job so much easier."</p>
+                <p className="landing-testimonial-text">&ldquo;As a teacher, I recommend EduSmart to all my students. The progress tracking and AI insights make my job so much easier.&rdquo;</p>
                 <div className="landing-testimonial-author">
                   <div className="landing-testimonial-avatar">RS</div>
                   <div><div className="landing-testimonial-name">Mrs. R. Silva</div><div className="landing-testimonial-role">A/L Teacher · Galle</div></div>
@@ -844,10 +912,48 @@ if (!authenticated) {
                   <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={portal === "admin" ? "admin@school.lk" : "you@example.com"} required /></label>
                   <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" minLength={8} required /></label>
                   {authView === "signup" && <label>Education level<select value={educationLevel} onChange={(event) => { setEducationLevel(event.target.value); setStream(""); setSubjects([]); setSubjectError(false); }} required><option value="" disabled>Select your level</option><option>Grade 6–11</option><option>GCE Ordinary Level (O/L)</option><option>GCE Advanced Level (A/L)</option></select></label>}
-                  {authView === "signup" && educationLevel === "GCE Advanced Level (A/L)" && <div className="academic-details"><label>Ad...</label></div>}
-                  <div className="auth-form-footer">
-                    <button type="submit" className="primary-button" style={{ width: '100%', justifyContent: 'center' }}>{authView === "login" ? "Sign In" : "Create Account"}</button>
-                  </div>
+                   {authView === "signup" && educationLevel === "GCE Advanced Level (A/L)" && (
+                     <div className="academic-details">
+                       <label>
+                         Stream
+                         <select
+                           value={stream}
+                           onChange={(event) => {
+                             setStream(event.target.value);
+                             setSubjects([]);
+                             setSubjectError(false);
+                           }}
+                           required
+                         >
+                           <option value="" disabled>Select your stream</option>
+                           {Object.keys(streamSubjects).map((subjectStream) => <option key={subjectStream}>{subjectStream}</option>)}
+                         </select>
+                       </label>
+                       {availableSubjects.length > 0 && (
+                         <fieldset aria-invalid={subjectError}>
+                           <legend>Choose your subjects</legend>
+                           {availableSubjects.map((subject) => (
+                             <label key={subject}>
+                               <input
+                                 type="checkbox"
+                                 checked={subjects.includes(subject)}
+                                 onChange={() => toggleSubject(subject)}
+                               />
+                               {subject}
+                             </label>
+                           ))}
+                         </fieldset>
+                       )}
+                       {subjectError && <p role="alert" style={{ margin: 0, color: "#b42318", fontSize: 13 }}>Choose at least one subject for your stream.</p>}
+                     </div>
+                   )}
+                   {authError && <p role="alert" style={{ margin: 0, color: "#b42318", fontSize: 13 }}>{authError}</p>}
+                   {authMessage && <p role="status" style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>{authMessage}</p>}
+                   <div className="auth-form-footer">
+                     <button type="submit" className="primary-button" style={{ width: '100%', justifyContent: 'center' }} disabled={authLoading} aria-busy={authLoading}>
+                       {authLoading ? (authView === "login" ? "Signing in..." : "Creating account...") : authView === "login" ? "Sign In" : "Create Account"}
+                     </button>
+                   </div>
                   <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: 'var(--muted)' }}>{authView === "login" ? "Don't have an account? " : "Already have an account? "}<button type="button" onClick={() => setAuthView(authView === "login" ? "signup" : "login")} style={{ color: 'var(--green)', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }}>{authView === "login" ? "Register" : "Login"}</button></p>
                 </form>
               </div>
@@ -897,12 +1003,33 @@ if (!authenticated) {
           <section className="section-heading"><div><p className="eyebrow">CURATED FOR YOUR PROFILE</p><h2>Keep learning</h2></div><button className="text-button">See all recommendations <span>→</span></button></section>
           <section className="video-grid">{contentVideos.map((video) => <article className="video-card" key={video.id}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</section>
 
-          <div className="lower-grid"><section><div className="section-heading compact"><div><p className="eyebrow">STAY ON TRACK</p><h2>Upcoming examinations</h2></div><button className="text-button">View calendar <span>→</span></button></div><div className="exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.title}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="arrow-button" onClick={() => openExam(exam)} aria-label={`Open ${exam.title}`}>↗</button></article>)}</div></section><section className="progress-panel"><div className="section-heading compact"><div><p className="eyebrow">YOUR PROGRESS</p><h2>Subject strengths</h2></div><button className="more-button">•••</button></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></div>
+          <div className="lower-grid"><section><div className="section-heading compact"><div><p className="eyebrow">STAY ON TRACK</p><h2>Upcoming examinations</h2></div><button className="text-button">View calendar <span>→</span></button></div><div className="exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.id}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="arrow-button" onClick={() => openExam(exam)} aria-label={`Open ${exam.title}`}>↗</button></article>)}</div></section><section className="progress-panel"><div className="section-heading compact"><div><p className="eyebrow">YOUR PROGRESS</p><h2>Subject strengths</h2></div><button className="more-button">•••</button></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></div>
           </>}
 
           {activeNav === "My learning" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">YOUR PERSONALISED LIBRARY</p><h1>My learning</h1><p className="subtitle">Pick up where you left off and keep your momentum going.</p></div></div><div className="learning-summary"><div><span className="eyebrow">CURRENT FOCUS</span><h2>Physics · Vectors</h2><p>68% complete · 3 lessons remaining</p></div><button className="primary-button">Continue learning <span>→</span></button></div><div className="video-grid">{contentVideos.map((video) => <article className="video-card" key={video.id}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</div></section>}
 
-          {activeNav === "Examinations" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">ASSESSMENTS AND DEADLINES</p><h1>Examinations</h1><p className="subtitle">Stay prepared for every upcoming assessment.</p></div></div><div className="exam-list nav-exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.title}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="primary-button" onClick={() => openExam(exam)}>Open exam <span>→</span></button></article>)}</div></section>}
+          {activeNav === "Examinations" && <section className="nav-page">
+            {contentError && <p role="alert" className="admin-upload-error">{contentError}</p>}
+            <div className="section-heading"><div><p className="eyebrow">QUICK PRACTICE</p><h1>Quiz exams</h1><p className="subtitle">Short quizzes published by your teachers, ready to attempt.</p></div></div>
+            {quizExams.length === 0
+              ? <p className="admin-empty">No quiz exams have been published yet.</p>
+              : <div className="exam-list nav-exam-list">{quizExams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.id}>
+                <div className="date-block"><strong>{exam.questions.length}</strong><span>QNS</span></div>
+                <div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.duration} <span>·</span> Quiz exam</p></div>
+                <button className="primary-button" onClick={() => openExam(exam)}>Start quiz <span>→</span></button>
+              </article>)}</div>}
+          </section>}
+
+          {activeNav === "Examinations" && <section className="nav-page">
+            <div className="section-heading"><div><p className="eyebrow">ASSESSMENTS AND DEADLINES</p><h2>Scheduled examinations</h2><p className="subtitle">Stay prepared for every upcoming assessment.</p></div></div>
+            {scheduledExams.length === 0
+              ? <p className="admin-empty">No scheduled examinations have been published yet.</p>
+              : <div className="exam-list nav-exam-list">{scheduledExams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.id}>
+                <div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div>
+                <div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div>
+                <button className="primary-button" onClick={() => openExam(exam)}>Open exam <span>→</span></button>
+              </article>)}</div>}
+          </section>}
 
           {activeNav === "Examinations" && <section className="nav-page written-paper-student-list"><div className="section-heading"><div><p className="eyebrow">ESSAY AND STRUCTURED PRACTICE</p><h2>Question papers</h2><p className="subtitle">Start the exam to begin its timer, then upload your scanned answer paper before time runs out.</p></div></div>{writtenPapers.length === 0 ? <p className="admin-empty">No essay or structured question papers have been published yet.</p> : <div className="written-paper-student-grid">{writtenPapers.map((paper) => <article className="written-paper-student-card" key={paper.id}><div className="written-paper-card-top"><div><span className="subject-tag">{paper.subject} &middot; {paper.educationLevel === "GRADE" ? `Grade${paper.grade ? ` ${paper.grade}` : ""}` : paper.educationLevel === "A_LEVEL" ? "A Level" : "O Level"}{paper.stream ? ` &middot; ${paper.stream}` : ""}</span><h3>{paper.title}</h3><p>{paper.fileName}{paper.fileName.toLowerCase().endsWith(".docx") ? " · Download to open this Word document." : ""}</p></div><a className="primary-button" href={`/api/written-papers/${paper.id}/download`}>Download question paper</a></div>{paper.fileName.toLowerCase().endsWith(".pdf") && <iframe className="written-paper-preview" src={`/api/written-papers/${paper.id}/download?inline=1`} title={`${paper.title} question paper`} />}<WrittenPaperAttempt paper={paper} /></article>)}</div>}</section>}
           {activeNav === "Progress" && <StudentProgress refreshKey={progressRefreshKey} />}
@@ -913,8 +1040,8 @@ if (!authenticated) {
         </div>
       </section>
 
-      {examOpen && activeExam && questions[question] && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">{activeExam.subject}</span><h2 id="exam-title">{activeExam.title}</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body" tabIndex={0} aria-label="Question and answer choices"><div className="question-number">{String(question + 1).padStart(2, "0")}</div><div className="question-content"><h3>{questions[question].prompt}</h3>{questions[question].imageUrl && <img className="student-question-image" src={questions[question].imageUrl} alt={`Image for question ${question + 1}`} />}{questions[question].options.map((option, optionIndex) => { const key = String.fromCharCode(65 + optionIndex); const optionImage = questions[question].optionImages?.[optionIndex]; return <label key={key}><input type="radio" name={`answer-${questions[question].id}`} checked={answers[questions[question].id] === key} onChange={() => setAnswers((current) => ({ ...current, [questions[question].id]: key }))} /> <span>{key}</span> {option}{optionImage && <img className="student-option-image" src={optionImage} alt={`Option ${key}`} />}</label>; })}</div></div><div className="exam-modal-bottom"><span>{examError || "Submit before the timer ends to save your answers."}</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => setQuestion(question + 1)}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => void submitExam()}>Submit exam <span>✓</span></button>}</div></div></section></div>}
-      {examResult && <div className="modal-backdrop"><section className="exam-modal exam-result-modal" role="dialog" aria-modal="true" aria-labelledby="result-title"><div className="exam-modal-top"><div><span className="subject-tag">EXAM RESULT</span><h2 id="result-title">{activeExam?.title}</h2></div><button className="close-button" onClick={() => setExamResult(null)} aria-label="Close result">×</button></div><div className="question-body"><div className="question-number">{Math.round(examResult.percentage)}%</div><div className="question-content"><h3>{examResult.percentage < 70 ? `Let's strengthen ${activeExam?.subject ?? "this subject"}.` : examResult.passed ? "Congratulations, you passed." : "Keep practising and try again."}</h3><p>You scored {examResult.obtainedMarks} of {examResult.totalMarks} marks ({examResult.percentage}%). {examResult.percentage < 70 ? "Your Progress page has practice suggestions based on your scores." : "Your result is saved to your Progress page."}</p></div></div><section className="exam-review-sheet" aria-label="Exam answer review"><h3>Answer review</h3>{examResult.review.map((item, index) => { const selectedIndex = item.selectedAnswer ? item.selectedAnswer.charCodeAt(0) - 65 : -1; const correctIndex = item.correctAnswer.charCodeAt(0) - 65; return <article className="exam-review-question" key={item.questionId}><div className="exam-review-heading"><strong>Question {String(index + 1).padStart(2, "0")}</strong><span className={item.isCorrect ? "review-correct" : "review-incorrect"}>{item.isCorrect ? "Correct" : "Incorrect"}</span></div><h4>{item.prompt}</h4>{item.imageUrl && <img className="student-question-image" src={item.imageUrl} alt={`Image for question ${index + 1}`} />}<p className={item.isCorrect ? "review-correct" : "review-incorrect"}><strong>Your answer:</strong> {selectedIndex >= 0 ? `${item.selectedAnswer}: ${item.options[selectedIndex]}` : "Not answered"}</p><p className="review-correct"><strong>Correct answer:</strong> {item.correctAnswer}: {item.options[correctIndex]}</p></article>; })}</section><div className="exam-modal-bottom"><span>Saved to your examination results.</span><button className="primary-button" onClick={() => setExamResult(null)}>Done</button></div></section></div>}
+      {examOpen && activeExam && questions[question] && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">{activeExam.subject}</span><h2 id="exam-title">{activeExam.title}</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body" tabIndex={0} aria-label="Question and answer choices"><div className="question-number">{String(question + 1).padStart(2, "0")}</div><div className="question-content"><h3>{questions[question].prompt}</h3>{questions[question].imageUrl && <Image className="student-question-image" src={questions[question].imageUrl} alt={`Image for question ${question + 1}`} width={1200} height={800} unoptimized />}{questions[question].options.map((option, optionIndex) => { const key = String.fromCharCode(65 + optionIndex); const optionImage = questions[question].optionImages?.[optionIndex]; return <label key={key}><input type="radio" name={`answer-${questions[question].id}`} checked={answers[questions[question].id] === key} onChange={() => setAnswers((current) => ({ ...current, [questions[question].id]: key }))} /> <span>{key}</span> {option}{optionImage && <Image className="student-option-image" src={optionImage} alt={`Option ${key}`} width={800} height={600} unoptimized />}</label>; })}</div></div><div className="exam-modal-bottom"><span>{examError || "Submit before the timer ends to save your answers."}</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => setQuestion(question + 1)}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => void submitExam()}>Submit exam <span>✓</span></button>}</div></div></section></div>}
+      {examResult && <div className="modal-backdrop"><section className="exam-modal exam-result-modal" role="dialog" aria-modal="true" aria-labelledby="result-title"><div className="exam-modal-top"><div><span className="subject-tag">EXAM RESULT</span><h2 id="result-title">{activeExam?.title}</h2></div><button className="close-button" onClick={() => setExamResult(null)} aria-label="Close result">×</button></div><div className="question-body"><div className="question-number">{Math.round(examResult.percentage)}%</div><div className="question-content"><h3>{examResult.percentage < 70 ? `Let's strengthen ${activeExam?.subject ?? "this subject"}.` : examResult.passed ? "Congratulations, you passed." : "Keep practising and try again."}</h3><p>You scored {examResult.obtainedMarks} of {examResult.totalMarks} marks ({examResult.percentage}%). {examResult.percentage < 70 ? "Your Progress page has practice suggestions based on your scores." : "Your result is saved to your Progress page."}</p></div></div><section className="exam-review-sheet" aria-label="Exam answer review"><h3>Answer review</h3>{examResult.review.map((item, index) => { const selectedIndex = item.selectedAnswer ? item.selectedAnswer.charCodeAt(0) - 65 : -1; const correctIndex = item.correctAnswer.charCodeAt(0) - 65; return <article className="exam-review-question" key={item.questionId}><div className="exam-review-heading"><strong>Question {String(index + 1).padStart(2, "0")}</strong><span className={item.isCorrect ? "review-correct" : "review-incorrect"}>{item.isCorrect ? "Correct" : "Incorrect"}</span></div><h4>{item.prompt}</h4>{item.imageUrl && <Image className="student-question-image" src={item.imageUrl} alt={`Image for question ${index + 1}`} width={1200} height={800} unoptimized />}<p className={item.isCorrect ? "review-correct" : "review-incorrect"}><strong>Your answer:</strong> {selectedIndex >= 0 ? `${item.selectedAnswer}: ${item.options[selectedIndex]}` : "Not answered"}</p><p className="review-correct"><strong>Correct answer:</strong> {item.correctAnswer}: {item.options[correctIndex]}</p></article>; })}</section><div className="exam-modal-bottom"><span>Saved to your examination results.</span><button className="primary-button" onClick={() => setExamResult(null)}>Done</button></div></section></div>}
       {profileOpen && <ProfileModal profile={profile} onClose={() => setProfileOpen(false)} onSignOut={async () => { setProfileOpen(false); await handleSignOut(); }} />}
       {authenticated && <div className="assistant-widget"><button className="assistant-launcher" onClick={() => setAssistantOpen((open) => !open)} aria-label={assistantOpen ? "Close EduSmart assistant" : "Open EduSmart assistant"}>{assistantOpen ? "×" : "✦"}<span className="assistant-pulse" /></button>{assistantOpen && <section className="assistant-panel" role="dialog" aria-label="EduSmart support assistant"><div className="assistant-head"><div><span className="assistant-avatar">✦</span><div><strong>EduSmart assistant</strong><small>Here to help</small></div></div><button onClick={() => setAssistantOpen(false)} aria-label="Close assistant">×</button></div><div className="assistant-messages">{assistantMessages.map((message, index) => <p className={`assistant-message ${message.from}`} key={`${message.from}-${index}`}>{message.text}</p>)}</div><div className="assistant-quick-actions"><button onClick={() => askAssistant("exams", "Show my exams")}>My exams</button><button onClick={() => askAssistant("learning", "Help with learning")}>Learning help</button><button onClick={() => askAssistant("books", "Where are the books?")}>Book shop</button></div><form className="assistant-form" onSubmit={submitAssistantMessage}><input value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Ask for support..." aria-label="Ask the assistant" /><button type="submit" aria-label="Send message">↑</button></form></section>}</div>}
     </main>

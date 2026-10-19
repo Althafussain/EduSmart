@@ -11,7 +11,6 @@ const ANSWER_MARKER = "\\b(?:correct\\s+(?:answer|option)|answer\\s+key|answers|
 const ANSWER_LEAD_IN = "(?:(?:the|and|so|thus|therefore|hence|then|is|its|of|right|final)\\s+){0,3}";
 const LETTER_LABEL = "(?:[A-E1-5]|iv|iii|ii|i|v)";
 const LONE_LABEL_LINE = new RegExp(`^\\s*(?:(?:question|q)\\.?\\s*)?(?:\\d{1,3}\\s*[.)\\-:]\\s*)?[([]?\\s*(${LETTER_LABEL})\\s*[)\\]]?[\\s.]*$`, "i");
-const TRAILING_KEY_LINE = /^(?:(?:question|q)\.?\s*)?(\d{1,3})\s*[.)\-:]\s*(.+)$/i;
 const ROMAN_RANKS: Record<string, number> = { i: 0, ii: 1, iii: 2, iv: 3, v: 4 };
 
 const ANSWER_KEY_HEADER = /(?:^|\n)\s*(?:(?:answer\s+key|answers|correct\s+answers|marking\s+scheme)\s*:?\s*|(?:answer|correct\s+answer)\s*:?\s*(?=\n|$))/i;

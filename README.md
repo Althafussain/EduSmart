@@ -11,12 +11,28 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+Use the committed `.env.example` as a template for local variables. Keep real credentials in `.env`; it is ignored by Git.
+
 ## Validate
 
 ```bash
 npm run lint
+npx tsc --noEmit
 npm run build
 ```
+
+## Deploy to Vercel
+
+1. Push this repository to GitHub and import `Althafussain/EduSmart` in Vercel. The repository root is the Next.js project root.
+2. Add these environment variables in the Vercel project settings for Production (and Preview if those deployments need the database):
+   - `DATABASE_URL`: the MongoDB Atlas connection string. Confirm the Atlas network access list allows connections from the deployment.
+   - `SESSION_SECRET`: a unique random secret of at least 32 characters. Do not reuse the local development secret.
+   - `GOOGLE_CLIENT_ID` and `NEXT_PUBLIC_GOOGLE_CLIENT_ID`: the same Google OAuth web client ID if Google sign-in is enabled. Add the deployed domain to the OAuth client's authorized JavaScript origins.
+3. Deploy. Dependencies run `prisma generate` during installation and Vercel builds the Next.js app with `npm run build`.
+4. In Vercel Project Settings → Domains, add `e-mind.lk` and optionally `www.e-mind.lk`. Follow the exact DNS records Vercel displays at the domain registrar, then wait for DNS verification and HTTPS provisioning.
+5. Verify sign-in, student exam flows, admin quiz publishing/reattempts, and uploads on the deployed domain.
+
+MongoDB Atlas must be reachable from Vercel, and MongoDB transaction support requires a replica set (Atlas provides this). Keep production credentials in Vercel environment variables; never commit `.env`.
 
 ## Product architecture
 

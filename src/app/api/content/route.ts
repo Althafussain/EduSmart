@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isQuizExam } from "@/lib/is-quiz-exam";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -12,5 +13,10 @@ export async function GET() {
     prisma.writtenPaper.findMany({ where: { published: true }, orderBy: { createdAt: "desc" }, select: { id: true, title: true, subject: true, educationLevel: true, grade: true, stream: true, fileName: true, durationMins: true, createdAt: true } }),
   ]);
 
-  return NextResponse.json({ books, videos, exams, writtenPapers: writtenPapers.map((paper) => ({ ...paper, durationMins: paper.durationMins ?? 60 })) });
+  return NextResponse.json({
+    books,
+    videos,
+    exams: exams.map((exam) => ({ ...exam, isQuiz: isQuizExam(exam) })),
+    writtenPapers: writtenPapers.map((paper) => ({ ...paper, durationMins: paper.durationMins ?? 60 })),
+  });
 }
