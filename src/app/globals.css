@@ -194,8 +194,8 @@ html { scroll-behavior: smooth; }
 
 /* Video Demo Section */
 .landing-video-demo { max-width: 1000px; margin: 0 auto; }
-.video-player-wrapper { display: grid; grid-template-columns: 1fr 400px; gap: 32px; align-items: start; background: #fff; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
-.video-thumbnail { position: relative; aspect-ratio: 16/9; background-size: cover; background-position: center; border-radius: 0; min-height: 320px; }
+.video-player-wrapper { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); gap: 32px; align-items: start; background: #fff; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+.video-thumbnail { position: relative; aspect-ratio: 16/9; background-size: cover; background-position: center; border-radius: 0; min-height: 0; }
 .video-play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; border: none; background: var(--green); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; box-shadow: 0 8px 30px rgba(38, 123, 104, 0.4); }
 .video-play-btn:hover { transform: translate(-50%, -50%) scale(1.1); background: #1e6b58; }
 .video-duration { position: absolute; bottom: 16px; right: 16px; background: rgba(0,0,0,0.8); color: #fff; padding: 4px 10px; border-radius: 6px; font: 600 12px Manrope, sans-serif; }
@@ -384,3 +384,138 @@ button { font: inherit; cursor: pointer; }
 /* Quiz Exam Manager specific */
 .admin-editor-fields .difficulty-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 .admin-editor-fields .difficulty-tab { font-size: 12px; padding: 8px 14px; }
+
+@media (max-width: 900px) {
+  .landing-nav-container {
+    gap: 12px;
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .landing-nav-links {
+    gap: 0;
+  }
+
+  .landing-nav-link {
+    padding-right: 10px;
+    padding-left: 10px;
+    white-space: nowrap;
+  }
+
+  .landing-nav-actions {
+    gap: 8px;
+  }
+
+  .landing-nav-actions .landing-btn-primary,
+  .landing-nav-actions .landing-btn-secondary {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .landing-grid-3,
+  .landing-grid-4,
+  .landing-features-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .landing-grid-3 > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: min(100%, 560px);
+  }
+
+  .video-thumbnail {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .landing-nav-links {
+    display: none;
+  }
+
+  .landing-nav-container {
+    gap: 12px;
+  }
+
+  .landing-nav-actions {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 600px) {
+  .landing-nav-container {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .landing-nav-brand {
+    gap: 6px;
+    font-size: 18px;
+    letter-spacing: -0.6px;
+  }
+
+  .landing-nav-brand .brand-mark {
+    width: 26px;
+    height: 26px;
+    font-size: 18px;
+  }
+
+  .landing-nav-actions {
+    gap: 6px;
+  }
+
+  .landing-nav-actions .landing-btn-primary,
+  .landing-nav-actions .landing-btn-secondary {
+    padding: 9px 11px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .landing-grid-3,
+  .landing-grid-4,
+  .landing-features-grid,
+  .landing-testimonials {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .landing-grid-3 > :last-child:nth-child(odd) {
+    grid-column: auto;
+    width: auto;
+  }
+
+  .landing-cta-section {
+    padding: 40px 20px;
+    border-radius: 16px;
+  }
+
+  .landing-cta-subtitle {
+    font-size: 16px;
+  }
+
+  .video-thumbnail {
+    min-height: 0;
+  }
+
+  .video-info {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 360px) {
+  .landing-nav-container {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .landing-nav-actions .landing-btn-primary,
+  .landing-nav-actions .landing-btn-secondary {
+    padding: 8px 9px;
+  }
+}
+
+@media (max-width: 300px) {
+  .landing-nav-actions .landing-btn-secondary {
+    display: none;
+  }
+}
