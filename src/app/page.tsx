@@ -359,6 +359,7 @@ export default function Home() {
   };
 
   const googleCredentialHandler = useRef(handleGoogleCredential);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
   const googleInitialized = useRef(false);
   useEffect(() => {
     googleCredentialHandler.current = handleGoogleCredential;
@@ -366,28 +367,40 @@ export default function Home() {
 
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    const toggle = document.querySelector<HTMLElement>(".auth-toggle");
-    if (authenticated || authView !== "login" || !clientId || !toggle) return;
+    const button = googleButtonRef.current;
+    if (authenticated || !showAuthPanel || portal !== "student" || !clientId || !button) return;
 
-    const button = document.createElement("div");
-    button.className = "google-signin";
-    toggle.append(button);
     const renderButton = () => {
-      if (!window.google) return;
+      if (!window.google || !button.isConnected) return;
       if (!googleInitialized.current) {
         window.google.accounts.id.initialize({ client_id: clientId, callback: ({ credential }) => googleCredentialHandler.current(credential) });
         googleInitialized.current = true;
       }
-      window.google.accounts.id.renderButton(button, { theme: "outline", size: "large", width: 350 });
+      button.replaceChildren();
+      window.google.accounts.id.renderButton(button, { theme: "outline", size: "large", width: Math.min(350, Math.max(200, button.clientWidth)) });
     };
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.onload = renderButton;
-    document.head.append(script);
-    if (window.google) renderButton();
-    return () => { button.remove(); script.remove(); };
-  }, [authenticated, authView]);
+    const scriptUrl = "https://accounts.google.com/gsi/client";
+    let script = document.querySelector<HTMLScriptElement>(`script[src="${scriptUrl}"]`);
+    if (window.google) {
+      renderButton();
+      return;
+    }
+
+    const onLoad = () => renderButton();
+    const onError = () => setAuthError("Google sign-in could not load. Please try again or use your email and password.");
+    if (!script) {
+      script = document.createElement("script");
+      script.src = scriptUrl;
+      script.async = true;
+      document.head.append(script);
+    }
+    script.addEventListener("load", onLoad);
+    script.addEventListener("error", onError);
+    return () => {
+      script?.removeEventListener("load", onLoad);
+      script?.removeEventListener("error", onError);
+    };
+  }, [authenticated, authView, portal, showAuthPanel]);
 
   useEffect(() => {
     fetch("/api/auth", { cache: "no-store" }).then((response) => response.json()).then((payload: { user?: AuthResponseUser | null }) => {
@@ -945,6 +958,16 @@ if (!authenticated) {
                          </fieldset>
                        )}
                        {subjectError && <p role="alert" style={{ margin: 0, color: "#b42318", fontSize: 13 }}>Choose at least one subject for your stream.</p>}
+                     </div>
+                   )}
+                   {portal === "student" && (
+                     <div className="google-auth-option">
+                       <div className="auth-divider"><span>or continue with</span></div>
+                       {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
+                         <div ref={googleButtonRef} className="google-signin" />
+                       ) : (
+                         <p className="google-config-message" role="status">Google sign-in is currently unavailable.</p>
+                       )}
                      </div>
                    )}
                    {authError && <p role="alert" style={{ margin: 0, color: "#b42318", fontSize: 13 }}>{authError}</p>}

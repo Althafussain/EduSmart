@@ -46,8 +46,15 @@ export async function POST(request: Request) {
       }
 
       const email = googleUser.email.toLowerCase();
-      const user = await prisma.user.findUnique({ where: { email } });
-      if (!user) return NextResponse.json({ error: "Create an account first, then sign in with Google." }, { status: 403 });
+      const user = await prisma.user.upsert({
+        where: { email },
+        update: {},
+        create: {
+          email,
+          fullName: googleUser.name?.trim() || "Student",
+          role: "STUDENT",
+        },
+      });
       await createSession(user.id);
       return NextResponse.json({ user: profileResponse(await getMongoUser()) });
     }

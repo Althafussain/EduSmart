@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
 @import "tailwindcss";
 
-.google-signin { display: flex; justify-content: center; margin-top: 14px; min-height: 40px; }
+.google-signin { display: flex; justify-content: center; margin-top: 12px; min-height: 40px; }
 .portal-switch { display: none !important; }
 
 /* Landing Page Animations */
@@ -523,6 +523,11 @@ button { font: inherit; cursor: pointer; }
 .mobile-dashboard-nav {
   display: none;
 }
+
+.google-auth-option { margin-top: 17px; }
+.auth-divider { display: flex; align-items: center; gap: 12px; color: #8aa29b; font-size: 11px; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.google-config-message { margin: 12px 0 0; color: #8aa29b; font-size: 12px; text-align: center; }
 
 @media (max-width: 600px) {
   .mobile-dashboard-nav {
