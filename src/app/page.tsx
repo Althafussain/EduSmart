@@ -988,6 +988,27 @@ if (!authenticated) {
         </div>
       </aside>
 
+      <nav className="mobile-dashboard-nav" aria-label="Main navigation">
+        {[
+          { item: "Overview", label: text.overview, icon: "⌂" },
+          { item: "My learning", label: text.learning, icon: "▣" },
+          { item: "Examinations", label: text.examinations, icon: "◷" },
+          { item: "Progress", label: text.progress, icon: "↗" },
+          { item: "Book shop", label: text.shop, icon: "▤" },
+          { item: "Settings", label: text.settings, icon: "⚙" },
+        ].map(({ item, label, icon }) => (
+          <button
+            key={item}
+            className={`nav-item ${activeNav === item ? "active" : ""}`}
+            onClick={() => setActiveNav(item)}
+            aria-current={activeNav === item ? "page" : undefined}
+          >
+            <span className="nav-icon" aria-hidden="true">{icon}</span>
+            <span className="mobile-dashboard-nav-label">{label}</span>
+          </button>
+        ))}
+      </nav>
+
       <section className="content-area">
         <header className="topbar"><div className="mobile-brand">edusmart<span>.</span></div><div className="breadcrumb">Workspace <span>/</span> {activeNav === "Overview" ? text.overview : activeNav === "My learning" ? text.learning : activeNav === "Examinations" ? text.examinations : activeNav === "Progress" ? text.progress : activeNav === "Book shop" ? text.shop : text.settings}</div><div className="top-actions"><div className="notification-wrap"><button className="icon-button" aria-label={text.notifications} aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}>♧{unreadNotifications > 0 && <span className="notification-dot" />}</button>{notificationsOpen && <section className="notification-panel" role="dialog" aria-label={text.notifications}><div className="notification-head"><div><span className="eyebrow">YOUR UPDATES</span><h2>{text.notifications}</h2></div><button className="notification-close" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></div><div className="notification-list"><article className={unreadNotifications > 0 ? "notification-item unread" : "notification-item"}><span className="notification-symbol">◷</span><div><strong>Physics exam reminder</strong><p>Your Unit 04 examination is on 24 Sep at 02:00 PM.</p><small>Today</small></div></article><article className={unreadNotifications > 1 ? "notification-item unread" : "notification-item"}><span className="notification-symbol">✦</span><div><strong>New learning insight</strong><p>You are close to mastering Physics. Keep practising vectors.</p><small>Yesterday</small></div></article></div><button className="mark-read-button" onClick={() => setUnreadNotifications(0)}>{unreadNotifications > 0 ? "Mark all as read" : "All caught up"}</button></section>}</div><button className="top-avatar" onClick={() => setProfileOpen(true)} aria-label="Open profile">{getInitials(profile.fullName)}</button></div></header>
         <div className="page-content">
