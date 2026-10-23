@@ -192,6 +192,7 @@ export default function Home() {
   const [authView, setAuthView] = useState<"login" | "signup">("login");
   const [showAuthPanel, setShowAuthPanel] = useState(false);
   const [fullName, setFullName] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
   const [email, setEmail] = useState("");
   const [profile, setProfile] = useState<StudentProfile>({ fullName: "Student", email: "", educationLevel: "Not provided", stream: "Not provided", subjects: [] });
   const [password, setPassword] = useState("");
@@ -310,7 +311,7 @@ export default function Home() {
 
     try {
       if (authView === "signup") {
-        const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "signup", email, password, fullName, educationLevel, stream, subjects }) });
+        const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "signup", email, password, fullName, mobileNumber, educationLevel, stream, subjects }) });
         const payload = (await response.json()) as { error?: string; user?: AuthResponseUser };
         if (!response.ok || !payload.user) throw new Error(payload.error ?? "Unable to create the account.");
         setAuthenticated(true);
@@ -909,6 +910,7 @@ if (!authenticated) {
                 </div>
                 <form className="auth-form" onSubmit={handleAuthSubmit}>
                   {authView === "signup" && <label>Full name<input type="text" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="e.g. Nethmi Silva" required /></label>}
+                  {authView === "signup" && <label>Mobile number<input type="tel" value={mobileNumber} onChange={(event) => setMobileNumber(event.target.value)} placeholder="Enter your mobile number" autoComplete="tel" required /></label>}
                   <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={portal === "admin" ? "admin@school.lk" : "you@example.com"} required /></label>
                   <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" minLength={8} required /></label>
                   {authView === "signup" && <label>Education level<select value={educationLevel} onChange={(event) => { setEducationLevel(event.target.value); setStream(""); setSubjects([]); setSubjectError(false); }} required><option value="" disabled>Select your level</option><option>Grade 6–11</option><option>GCE Ordinary Level (O/L)</option><option>GCE Advanced Level (A/L)</option></select></label>}

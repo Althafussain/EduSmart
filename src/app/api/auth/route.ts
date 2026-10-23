@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       email?: string;
       password?: string;
       fullName?: string;
+      mobileNumber?: string;
       educationLevel?: string;
       stream?: string;
       subjects?: string[];
@@ -59,6 +60,9 @@ export async function POST(request: Request) {
     if (password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
 
     if (body.action === "signup") {
+      const mobileNumber = body.mobileNumber?.trim();
+      if (!mobileNumber) return NextResponse.json({ error: "Mobile number is required." }, { status: 400 });
+
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
 
@@ -67,6 +71,7 @@ export async function POST(request: Request) {
           email,
           passwordHash: await hashPassword(password),
           fullName: body.fullName?.trim() || "Student",
+          mobileNumber,
           role: "STUDENT",
           educationLevel: body.educationLevel?.trim() || null,
           stream: body.stream?.trim() || null,
