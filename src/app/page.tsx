@@ -33,6 +33,15 @@ const streamSubjects: Record<string, string[]> = {
 type BookCard = { id: string; title: string; author: string; subject: string; level: string; price: string; color: string; imageUrl: string };
 type ExtractedExamQuestion = { prompt: string; options: string[]; correctAnswer: string | null; imageUrl?: string | null; optionImages?: (string | null)[] };
 type PublishedWrittenPaper = { id: string; title: string; subject: string; educationLevel: string; grade: number | null; stream: string | null; fileName: string; durationMins: number };
+type LearningCategory = "Exams" | "Books" | "Videos" | "Quiz";
+type LearningShowcaseCard = { id: string; title: string; subject: string; detail: string; image: string; action: "examinations" | "bookshop" | "learning"; video?: VideoCard };
+
+const learningCategoryImages = {
+  Exams: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&h=500&fit=crop",
+  Books: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&h=500&fit=crop",
+  Videos: "https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=800&h=500&fit=crop",
+  Quiz: "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=800&h=500&fit=crop",
+};
 
 const assistantReplies: Record<string, string> = {
   exams: "You have two upcoming examinations. Combined Mathematics is on 18 Sep at 09:00 AM, followed by Physics on 24 Sep at 02:00 PM.",
@@ -190,6 +199,7 @@ export default function Home() {
   const [contentExams, setContentExams] = useState<PublishedExam[]>([]);
   const [contentError, setContentError] = useState("");
   const [writtenPapers, setWrittenPapers] = useState<PublishedWrittenPaper[]>([]);
+  const [learningCategory, setLearningCategory] = useState<LearningCategory>("Exams");
   const [authView, setAuthView] = useState<"login" | "signup">("login");
   const [showAuthPanel, setShowAuthPanel] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -239,6 +249,26 @@ export default function Home() {
   const exams = publishedExam ? [publishedExam, ...contentExams] : contentExams;
   const quizExams = exams.filter((exam) => exam.isQuiz);
   const scheduledExams = exams.filter((exam) => !exam.isQuiz);
+  const learningShowcaseCards: LearningShowcaseCard[] = learningCategory === "Exams"
+    ? [
+        ...scheduledExams.slice(0, 3).map((exam) => ({ id: exam.id, title: exam.title, subject: exam.subject, detail: `${exam.date} · ${exam.duration}`, image: learningCategoryImages.Exams, action: "examinations" as const })),
+        ...writtenPapers.slice(0, 3).map((paper) => ({ id: paper.id, title: paper.title, subject: `${paper.subject} · Written paper`, detail: `${paper.durationMins} min · Essay / structured`, image: learningCategoryImages.Exams, action: "examinations" as const })),
+      ]
+    : learningCategory === "Books"
+      ? contentBooks.slice(0, 3).map((book) => ({ id: book.id, title: book.title, subject: book.subject, detail: `${book.level} · ${book.price}`, image: book.imageUrl || learningCategoryImages.Books, action: "bookshop" as const }))
+      : learningCategory === "Videos"
+        ? contentVideos.slice(0, 3).map((video) => ({ id: video.id, title: video.title, subject: video.subject, detail: `${video.level} · ${video.duration}`, image: video.image, action: "learning" as const, video }))
+        : quizExams.slice(0, 3).map((exam) => ({ id: exam.id, title: exam.title, subject: exam.subject, detail: `${exam.questions.length} questions · ${exam.duration}`, image: learningCategoryImages.Quiz, action: "examinations" as const }));
+  const fallbackLearningCards: LearningShowcaseCard[] = learningShowcaseCards.length
+    ? learningShowcaseCards
+    : [{
+        id: `sample-${learningCategory.toLowerCase()}`,
+        title: learningCategory === "Exams" ? "Explore exam papers" : learningCategory === "Books" ? "Explore revision books" : learningCategory === "Videos" ? "Explore video lessons" : "Try a quick quiz",
+        subject: learningCategory === "Exams" ? "Exam preparation" : learningCategory === "Books" ? "Study resources" : learningCategory === "Videos" ? "On-demand learning" : "Quick practice",
+        detail: learningCategory === "Exams" ? "Practice papers for your next assessment" : learningCategory === "Books" ? "Find guides for your subjects and level" : learningCategory === "Videos" ? "Watch lessons and revise at your pace" : "Short quizzes to check your understanding",
+        image: learningCategoryImages[learningCategory],
+        action: learningCategory === "Books" ? "bookshop" : learningCategory === "Videos" ? "learning" : "examinations",
+      }];
   const calendarDays = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
   const calendarStartOffset = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay();
   const languageOptions = ["English", "සිංහල", "தமிழ்"];
@@ -1054,8 +1084,37 @@ if (!authenticated) {
             <div className="stat-card"><div className="stat-label">HOURS LEARNED <span>↗</span></div><div className="stat-value">24<small>h</small> <em>18m</em></div><div className="stat-foot">Goal: 30h this month</div></div>
           </section>
 
-          <section className="section-heading"><div><p className="eyebrow">CURATED FOR YOUR PROFILE</p><h2>Keep learning</h2></div><button className="text-button">See all recommendations <span>→</span></button></section>
-          <section className="video-grid">{contentVideos.map((video) => <article className="video-card" key={video.id}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</section>
+          <section className="section-heading"><div><p className="eyebrow">CURATED FOR YOUR PROFILE</p><h2>Keep learning</h2></div><button className="text-button" onClick={() => setActiveNav("My learning")}>See all recommendations <span>→</span></button></section>
+          <section className="learning-showcase" aria-label="Learning recommendations">
+            <div className="learning-category-tabs" role="tablist" aria-label="Recommendation categories">
+              {(["Exams", "Books", "Videos", "Quiz"] as const).map((category) => (
+                <button key={category} className={`learning-category-tab${learningCategory === category ? " active" : ""}`} onClick={() => setLearningCategory(category)} role="tab" aria-selected={learningCategory === category}>
+                  <span aria-hidden="true">{category === "Exams" ? "▣" : category === "Books" ? "▤" : category === "Videos" ? "▶" : "✓"}</span>{category}
+                </button>
+              ))}
+            </div>
+            <div className="learning-showcase-grid">
+              {fallbackLearningCards.map((card) => (
+                <article className="learning-showcase-card" key={card.id}>
+                  <div className={`learning-showcase-image ${learningCategory.toLowerCase()}`} style={{ backgroundImage: `linear-gradient(180deg, transparent 35%, rgba(20, 47, 41, .55)), url("${card.image}")` }}>
+                    <span>{learningCategory}</span>
+                    {learningCategory === "Videos" && <span className="learning-image-play" aria-hidden="true">▶</span>}
+                  </div>
+                  <div className="learning-showcase-copy">
+                    <span className="subject-tag">{card.subject}</span>
+                    <h3>{card.title}</h3>
+                    <p>{card.detail}</p>
+                    <button className="learning-showcase-link" onClick={() => {
+                      if (card.video) setSelectedVideo(card.video);
+                      else setActiveNav(card.action === "bookshop" ? "Book shop" : card.action === "learning" ? "My learning" : "Examinations");
+                    }}>
+                      {card.video ? "Watch lesson" : card.action === "bookshop" ? "Browse books" : card.action === "learning" ? "Explore videos" : learningCategory === "Quiz" ? "Explore quizzes" : "Explore exams"} <span>→</span>
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
 
           <div className="lower-grid"><section><div className="section-heading compact"><div><p className="eyebrow">STAY ON TRACK</p><h2>Upcoming examinations</h2></div><button className="text-button" onClick={() => setCalendarOpen(true)}>View calendar <span>→</span></button></div><div className="exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.id}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="arrow-button" onClick={() => openExam(exam)} aria-label={`Open ${exam.title}`}>↗</button></article>)}{writtenPapers.map((paper) => <article className="exam-row mint" key={`paper-${paper.id}`}><div className="date-block"><strong>PDF</strong><span>PAPER</span></div><div className="exam-info"><span className="subject-tag">{paper.subject} · Written paper</span><h3>{paper.title}</h3><p>{paper.durationMins} min <span>·</span> Essay / structured practice</p></div><button className="arrow-button" onClick={() => setActiveNav("Examinations")} aria-label={`Open ${paper.title} written paper`}>↗</button></article>)}{exams.length === 0 && writtenPapers.length === 0 && <p className="admin-empty">No upcoming exams or written papers have been published yet.</p>}</div></section><section className="progress-panel"><div className="section-heading compact"><div><p className="eyebrow">YOUR PROGRESS</p><h2>Subject strengths</h2></div><button className="more-button">•••</button></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></div>
           </>}
