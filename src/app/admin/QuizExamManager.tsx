@@ -446,7 +446,7 @@ export default function QuizExamManager() {
               <label className="bulk-question-paste" style={{ gridColumn: "1 / -1" }}>
                 Paste Questions
                 <div ref={pasteBoxRef} className="bulk-question-rich-editor" contentEditable suppressContentEditableWarning role="textbox" aria-label="Paste questions" aria-multiline="true" data-placeholder="Paste questions here. Format: 1. Question\nA) Option A\nB) Option B\nAnswer: A" onInput={(event) => setPastedText(event.currentTarget.innerText)} />
-                <small>Paste questions in format: 1. Question text\nA) Option A\nB) Option B\nC) Option C\nD) Option D\nAnswer: A</small>
+                <small>Paste questions in format: 1. Question text\nA- Statement one\nB- Statement two\n1) A only\n2) B only\nAnswer: 2. Statement labels such as A-, B-, C- stay in the question; numbered or lettered answer choices are identified separately.</small>
                 <button type="button" className="secondary-button" onClick={processPastedQuestions} disabled={!pastedText.trim()}>Add Pasted Questions</button>
                 {pasteError && <p className="admin-upload-error" style={{ marginTop: 8 }}>{pasteError}</p>}
                 {pasteMessage && <p className="admin-upload-status" style={{ marginTop: 8 }}>{pasteMessage}</p>}
