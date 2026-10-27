@@ -58,7 +58,7 @@
 .delay-800 { animation-delay: 800ms; }
 .delay-1000 { animation-delay: 1000ms; }
 
-.landing-section { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 80px 20px; }
+.landing-section { display: flex; flex-direction: column; justify-content: center; padding: 80px 20px; }
 .landing-container { max-width: 1200px; margin: 0 auto; width: 100%; }
 .landing-grid { display: grid; gap: 40px; align-items: center; }
 .landing-grid-2 { grid-template-columns: 1fr 1fr; }
@@ -120,10 +120,6 @@
 .landing-footer-links { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
 .landing-footer-link { color: var(--muted); text-decoration: none; font-weight: 500; transition: color 0.2s; }
 .landing-footer-link:hover { color: var(--green); }
-
-/* Scroll animations */
-.reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.8s ease, transform 0.8s ease; }
-.reveal.active { opacity: 1; transform: translateY(0); }
 
 /* Smooth scroll */
 html { scroll-behavior: smooth; }
