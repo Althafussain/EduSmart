@@ -1,6 +1,6 @@
-# eminds
+# E-mind
 
-eminds is a responsive Next.js App Router experience for Sri Lankan students. The first vertical slice is the student workspace and timed examination flow: personalized learning cards, upcoming exams, subject progress, an AI insight panel, and a usable exam modal with a live countdown and question navigation.
+E-mind is a responsive Next.js App Router experience for Sri Lankan students. The first vertical slice is the student workspace and timed examination flow: personalized learning cards, upcoming exams, subject progress, an AI insight panel, and a usable exam modal with a live countdown and question navigation.
 
 ## Run locally
 

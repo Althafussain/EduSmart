@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "eminds, Sri Lanka O/L and A/L learning and exam practice";
+  "E-mind, Sri Lanka O/L and A/L learning and exam practice";
 export const size = {
   width: 1200,
   height: 630,
@@ -50,7 +50,7 @@ export default function OpenGraphImage() {
           >
             e
           </div>
-          eminds
+          E-mind
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div
