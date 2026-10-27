@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "EduSmart e-Mind, Sri Lanka O/L and A/L learning and exam practice";
+  "eminds, Sri Lanka O/L and A/L learning and exam practice";
 export const size = {
   width: 1200,
   height: 630,
@@ -50,8 +50,7 @@ export default function OpenGraphImage() {
           >
             e
           </div>
-          EduSmart
-          <span style={{ color: "#c88624" }}>· e-Mind</span>
+          eminds
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div
