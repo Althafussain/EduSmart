@@ -21,7 +21,14 @@ declare global {
 }
 
 type VideoCard = { id: string; title: string; subject: string; level: string; duration: string; color: string; image: string; videoUrl: string };
+type LandingStats = { activeStudents: number; practiceExams: number };
 const recommendedVideos: VideoCard[] = [];
+
+function isLandingStats(value: unknown): value is LandingStats {
+  if (!value || typeof value !== "object") return false;
+  return "activeStudents" in value && "practiceExams" in value
+    && Number.isInteger(value.activeStudents) && Number.isInteger(value.practiceExams);
+}
 
 const streamSubjects: Record<string, string[]> = {
   "Biological Science": ["Biology", "Chemistry", "Physics"],
@@ -198,6 +205,8 @@ export default function Home() {
   const [contentBooks, setContentBooks] = useState<BookCard[]>([]);
   const [contentExams, setContentExams] = useState<PublishedExam[]>([]);
   const [contentError, setContentError] = useState("");
+  const [landingStats, setLandingStats] = useState<LandingStats | null>(null);
+  const [landingStatsError, setLandingStatsError] = useState(false);
   const [writtenPapers, setWrittenPapers] = useState<PublishedWrittenPaper[]>([]);
   const [learningCategory, setLearningCategory] = useState<LearningCategory>("Exams");
   const [authView, setAuthView] = useState<"login" | "signup">("login");
@@ -453,6 +462,26 @@ export default function Home() {
   }, [router]);
 
   useEffect(() => {
+    let current = true;
+    fetch("/api/stats", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Landing page statistics could not be loaded.");
+        const payload: unknown = await response.json();
+        if (!isLandingStats(payload)) throw new Error("Landing page statistics response was invalid.");
+        if (current) {
+          setLandingStats(payload);
+          setLandingStatsError(false);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("Landing page statistics could not be loaded:", error);
+        if (current) setLandingStatsError(true);
+      });
+
+    return () => { current = false; };
+  }, []);
+
+  useEffect(() => {
     fetch("/api/content").then((response) => {
       if (!response.ok) throw new Error("Published content could not be loaded.");
       return response.json();
@@ -605,11 +634,10 @@ if (!authenticated) {
                   <button className="landing-btn-secondary" onClick={() => { setPortal("student"); setAuthView("login"); setShowAuthPanel(true); }}>Login to your space</button>
                 </div>
                 <div className="landing-stats animate-fade-in-up delay-400">
-                  <div className="landing-stat-item"><div className="landing-stat-value">15K+</div><div className="landing-stat-label">Active Students</div></div>
-                  <div className="landing-stat-item"><div className="landing-stat-value">500+</div><div className="landing-stat-label">Practice Exams</div></div>
-                  <div className="landing-stat-item"><div className="landing-stat-value">94%</div><div className="landing-stat-label">Success Rate</div></div>
-                  <div className="landing-stat-item"><div className="landing-stat-value">24/7</div><div className="landing-stat-label">AI Support</div></div>
+                  <div className="landing-stat-item"><div className="landing-stat-value">{landingStats ? landingStats.activeStudents.toLocaleString() : landingStatsError ? "—" : "…"}</div><div className="landing-stat-label">Students active in last 30 days</div></div>
+                  <div className="landing-stat-item"><div className="landing-stat-value">{landingStats ? landingStats.practiceExams.toLocaleString() : landingStatsError ? "—" : "…"}</div><div className="landing-stat-label">Published practice exams</div></div>
                 </div>
+                {landingStatsError && <p className="landing-stats-error" role="status">Live statistics are temporarily unavailable.</p>}
                 <div className="landing-trust-badges animate-fade-in-up delay-500">
                   <span>Trusted by schools across Colombo, Kandy, Galle & Jaffna</span>
                   <div className="landing-trust-logos">

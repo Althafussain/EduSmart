@@ -83,9 +83,10 @@
 .landing-hero-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
 
 .landing-stats { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; margin-top: 48px; }
-.landing-stat-item { text-align: center; }
+.landing-stat-item { min-width: 0; max-width: 250px; text-align: center; }
 .landing-stat-value { font: 800 clamp(36px, 5vw, 56px) Manrope, sans-serif; color: var(--green); line-height: 1; }
 .landing-stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+.landing-stats-error { margin: 12px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
 
 .landing-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 40px; }
 .landing-feature-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 32px; text-align: center; transition: all 0.3s ease; position: relative; overflow: hidden; }
