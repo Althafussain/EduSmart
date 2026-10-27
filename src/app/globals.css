@@ -857,6 +857,46 @@ button { font: inherit; cursor: pointer; }
 }
 
 @media (max-width: 380px) {
+  .landing-nav-container {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .landing-nav-brand {
+    gap: 5px;
+    font-size: 16px;
+  }
+
+  .landing-nav-brand .brand-mark {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+  }
+
+  .landing-nav-actions {
+    gap: 4px;
+  }
+
+  .landing-nav-actions .landing-btn-primary,
+  .landing-nav-actions .landing-btn-secondary {
+    padding: 6px 7px;
+    font-size: 12px;
+  }
+
+  .landing-hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .landing-hero-content {
+    min-width: 0;
+  }
+
+  .landing-hero-title {
+    font-size: clamp(30px, 10vw, 36px);
+    letter-spacing: -1.6px;
+  }
+
   .page-content {
     padding-right: 14px;
     padding-left: 14px;
