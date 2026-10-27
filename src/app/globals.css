@@ -167,6 +167,10 @@ html { scroll-behavior: smooth; }
 .float-card-2 { top: 45%; right: -15%; animation-delay: 1000ms; }
 .float-card-3 { bottom: 10%; left: 8%; animation-delay: 2000ms; }
 
+@media (min-width: 901px) and (max-width: 1365px) {
+  .float-card-2 { right: 0; }
+}
+
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-12px); }
