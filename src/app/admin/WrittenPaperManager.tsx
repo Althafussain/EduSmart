@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 type Submission = { id: string; fileName: string | null; submittedAt: string | null; student?: { fullName: string; email: string; mobileNumber: string | null } };
-type WrittenPaper = { id: string; title: string; subject: string; educationLevel: string; grade: number | null; stream: string | null; fileName: string; durationMins: number; published: boolean; createdAt: string; submissions: Submission[] };
+type WrittenPaper = { id: string; title: string; subject: string; educationLevel: string; grade: number | null; stream: string | null; fileName: string; durationMins: number; published: boolean; answerSchemeFileName: string | null; answerSchemePublished: boolean; createdAt: string; submissions: Submission[] };
 
 const levelLabels: Record<string, string> = { GRADE: "Grade 1-13", O_LEVEL: "O Level", A_LEVEL: "A Level" };
 
@@ -16,6 +16,8 @@ export default function WrittenPaperManager() {
   const [stream, setStream] = useState("");
   const [durationMins, setDurationMins] = useState("60");
   const [file, setFile] = useState<File | null>(null);
+  const [answerSchemeFiles, setAnswerSchemeFiles] = useState<Record<string, File | null>>({});
+  const [answerSchemeLoadingId, setAnswerSchemeLoadingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -77,6 +79,54 @@ export default function WrittenPaperManager() {
     await loadPapers();
   }
 
+  async function uploadAnswerScheme(paper: WrittenPaper) {
+    const schemeFile = answerSchemeFiles[paper.id];
+    if (!schemeFile) {
+      setError("Choose a PDF or DOCX answer scheme to upload.");
+      return;
+    }
+    if (schemeFile.size > 10 * 1024 * 1024) {
+      setError("The answer scheme must be no larger than 10 MB.");
+      return;
+    }
+
+    setAnswerSchemeLoadingId(paper.id); setError(""); setStatus("");
+    const form = new FormData();
+    form.set("file", schemeFile);
+    try {
+      const response = await fetch(`/api/admin/written-papers/${paper.id}/answer-scheme`, { method: "POST", body: form });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Could not upload the answer scheme.");
+      setStatus("Answer scheme uploaded. Publish it when it is ready for students.");
+      setAnswerSchemeFiles((current) => ({ ...current, [paper.id]: null }));
+      await loadPapers();
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Could not upload the answer scheme.");
+    } finally {
+      setAnswerSchemeLoadingId(null);
+    }
+  }
+
+  async function toggleAnswerScheme(paper: WrittenPaper) {
+    setAnswerSchemeLoadingId(paper.id); setError(""); setStatus("");
+    try {
+      const publish = !paper.answerSchemePublished;
+      const response = await fetch(`/api/admin/written-papers/${paper.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answerSchemePublished: publish }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Could not update answer scheme availability.");
+      setStatus(publish ? "Answer scheme published for students." : "Answer scheme unpublished.");
+      await loadPapers();
+    } catch (publishError) {
+      setError(publishError instanceof Error ? publishError.message : "Could not update answer scheme availability.");
+    } finally {
+      setAnswerSchemeLoadingId(null);
+    }
+  }
+
   async function deletePaper(paper: WrittenPaper) {
     if (!window.confirm(`Delete "${paper.title}" and its uploaded document?`)) return;
     const response = await fetch(`/api/admin/written-papers/${paper.id}`, { method: "DELETE" });
@@ -101,7 +151,7 @@ export default function WrittenPaperManager() {
       <div className="admin-editor-footer"><span>{file ? `Ready to upload: ${file.name}` : "Choose the question paper document to upload."}</span><div><button type="submit" data-published="false" className="secondary-button" disabled={loading || !file}>{loading ? "Saving..." : "Save as draft"}</button><button type="submit" data-published="true" className="primary-button" disabled={loading || !file}>Publish to students</button></div></div>
     </form>
     <section className="admin-record-list"><div className="admin-record-list-head"><strong>{papers.length} written papers</strong><button className="secondary-button" onClick={() => void loadPapers()}>Refresh</button></div>
-      {papers.length === 0 ? <p className="admin-empty">No essay or structured papers yet.</p> : papers.map((paper) => <article className="admin-record written-paper-record" key={paper.id}><div><strong>{paper.title} - {paper.subject}</strong><small>{paper.published ? "Published" : "Draft"} - {paper.durationMins} minutes - {levelLabels[paper.educationLevel] ?? paper.educationLevel}{paper.grade ? ` ${paper.grade}` : ""}{paper.stream ? ` - ${paper.stream}` : ""} - {paper.fileName}</small>{paper.submissions.length > 0 && <details><summary>{paper.submissions.length} submitted answer paper{paper.submissions.length === 1 ? "" : "s"}</summary><ul>{paper.submissions.map((submission) => <li key={submission.id}>{submission.student?.fullName ?? "Student"} ({submission.student?.email ?? ""}) · Mobile: {submission.student?.mobileNumber || "Not provided"} · {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : ""} · <a href={`/api/admin/written-papers/${paper.id}/submissions/${submission.id}`}>Download {submission.fileName ?? "answer paper"}</a></li>)}</ul></details>}</div><div className="admin-record-actions"><a href={`/api/written-papers/${paper.id}/download`} className="secondary-button">Download paper</a><button onClick={() => void togglePublished(paper)}>{paper.published ? "Unpublish" : "Publish"}</button><button className="danger-button" onClick={() => void deletePaper(paper)}>Delete</button></div></article>)}
+      {papers.length === 0 ? <p className="admin-empty">No essay or structured papers yet.</p> : papers.map((paper) => <article className="admin-record written-paper-record" key={paper.id}><div><strong>{paper.title} - {paper.subject}</strong><small>{paper.published ? "Published" : "Draft"} - {paper.durationMins} minutes - {levelLabels[paper.educationLevel] ?? paper.educationLevel}{paper.grade ? ` ${paper.grade}` : ""}{paper.stream ? ` - ${paper.stream}` : ""} - {paper.fileName}</small><details className="written-paper-scheme-admin"><summary>{paper.answerSchemeFileName ? `Answer scheme: ${paper.answerSchemeFileName} · ${paper.answerSchemePublished ? "Published" : "Not published"}` : "Upload answer scheme"}</summary><p>Upload the answer scheme after the exam. Students cannot access it until you publish it.</p><label>Answer scheme document (PDF or DOCX)<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => { setAnswerSchemeFiles((current) => ({ ...current, [paper.id]: event.target.files?.[0] ?? null })); setError(""); setStatus(""); }} /><small>Up to 10 MB. Uploading a replacement makes it unpublished until you publish it again.</small></label><div className="admin-record-actions"><button type="button" className="secondary-button" disabled={answerSchemeLoadingId === paper.id || !answerSchemeFiles[paper.id]} onClick={() => void uploadAnswerScheme(paper)}>{answerSchemeLoadingId === paper.id ? "Saving..." : "Upload answer scheme"}</button>{paper.answerSchemeFileName && <button type="button" disabled={answerSchemeLoadingId === paper.id} onClick={() => void toggleAnswerScheme(paper)}>{paper.answerSchemePublished ? "Unpublish answer scheme" : "Publish answer scheme"}</button>}</div></details>{paper.submissions.length > 0 && <details><summary>{paper.submissions.length} submitted answer paper{paper.submissions.length === 1 ? "" : "s"}</summary><ul>{paper.submissions.map((submission) => <li key={submission.id}>{submission.student?.fullName ?? "Student"} ({submission.student?.email ?? ""}) · Mobile: {submission.student?.mobileNumber || "Not provided"} · {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : ""} · <a href={`/api/admin/written-papers/${paper.id}/submissions/${submission.id}`}>Download {submission.fileName ?? "answer paper"}</a></li>)}</ul></details>}</div><div className="admin-record-actions"><a href={`/api/written-papers/${paper.id}/download`} className="secondary-button">Download paper</a><button onClick={() => void togglePublished(paper)}>{paper.published ? "Unpublish" : "Publish"}</button><button className="danger-button" onClick={() => void deletePaper(paper)}>Delete</button></div></article>)}
     </section>
   </section>;
 }

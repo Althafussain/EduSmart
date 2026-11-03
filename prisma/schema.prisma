@@ -250,6 +250,10 @@ model WrittenPaper {
   mimeType       String
   document       Bytes
   published      Boolean        @default(false)
+  answerSchemeFileName String?
+  answerSchemeMimeType String?
+  answerSchemeDocument Bytes?
+  answerSchemePublished Boolean @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }

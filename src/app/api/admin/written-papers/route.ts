@@ -15,7 +15,7 @@ export async function GET() {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Administrator access is required." }, { status: 403 });
   const papers = await prisma.writtenPaper.findMany({
     orderBy: { createdAt: "desc" },
-    select: { id: true, title: true, subject: true, educationLevel: true, grade: true, stream: true, fileName: true, durationMins: true, published: true, createdAt: true },
+    select: { id: true, title: true, subject: true, educationLevel: true, grade: true, stream: true, fileName: true, durationMins: true, published: true, answerSchemeFileName: true, answerSchemePublished: true, createdAt: true },
   });
   const attempts = await prisma.writtenPaperAttempt.findMany({ where: { paperId: { in: papers.map((paper) => paper.id) }, submittedAt: { not: null } }, select: { id: true, paperId: true, userId: true, fileName: true, submittedAt: true }, orderBy: { submittedAt: "desc" } });
   const users = await prisma.user.findMany({ where: { id: { in: [...new Set(attempts.map((attempt) => attempt.userId))] } }, select: { id: true, fullName: true, email: true, mobileNumber: true } });
