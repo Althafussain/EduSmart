@@ -279,16 +279,27 @@ function optionStyleOf(match: RegExpMatchArray): OptionStyle | null {
   return null;
 }
 
-/** A stem that lists statements as (i)-(iv) must not mix them with the real A-D choices. */
+/** Keep only the final consecutive choice list when a stem also labels its statements. */
 function selectOptionMatches(matches: RegExpMatchArray[]) {
-  const counts: Record<OptionStyle, number> = { letter: 0, digit: 0, roman: 0 };
+  const groups: RegExpMatchArray[][] = [];
   for (const match of matches) {
     const style = optionStyleOf(match);
-    if (style) counts[style] += 1;
+    const label = match.slice(1).find(Boolean) ?? "";
+    const rank = optionRank(label);
+    const previousGroup = groups[groups.length - 1];
+    const previous = previousGroup?.[previousGroup.length - 1];
+    const previousStyle = previous ? optionStyleOf(previous) : null;
+    const previousLabel = previous?.slice(1).find(Boolean) ?? "";
+
+    if (previousGroup && previousStyle === style && rank === optionRank(previousLabel) + 1) {
+      previousGroup.push(match);
+    } else {
+      groups.push([match]);
+    }
   }
-  const winner = (["letter", "digit", "roman"] as OptionStyle[]).find((style) => counts[style] >= 2);
-  if (!winner) return matches;
-  return matches.filter((match) => optionStyleOf(match) === winner);
+
+  const choiceGroups = groups.filter((group) => group.length >= 2);
+  return choiceGroups.length ? choiceGroups[choiceGroups.length - 1] : matches;
 }
 
 function parseQuestionBlock(rawBlock: string) {

@@ -21,7 +21,14 @@ declare global {
 }
 
 type VideoCard = { id: string; title: string; subject: string; level: string; duration: string; color: string; image: string; videoUrl: string };
+type LandingStats = { activeStudents: number; practiceExams: number };
 const recommendedVideos: VideoCard[] = [];
+
+function isLandingStats(value: unknown): value is LandingStats {
+  if (!value || typeof value !== "object") return false;
+  return "activeStudents" in value && "practiceExams" in value
+    && Number.isInteger(value.activeStudents) && Number.isInteger(value.practiceExams);
+}
 
 const streamSubjects: Record<string, string[]> = {
   "Biological Science": ["Biology", "Chemistry", "Physics"],
@@ -33,6 +40,7 @@ const streamSubjects: Record<string, string[]> = {
 type BookCard = { id: string; title: string; author: string; subject: string; level: string; price: string; color: string; imageUrl: string };
 type ExtractedExamQuestion = { prompt: string; options: string[]; correctAnswer: string | null; imageUrl?: string | null; optionImages?: (string | null)[] };
 type PublishedWrittenPaper = { id: string; title: string; subject: string; educationLevel: string; grade: number | null; stream: string | null; fileName: string; durationMins: number };
+type LearningShowcaseCard = { title: string; description: string; summary: string; image: string; icon: string; destination: string | null; actionLabel: string };
 
 const assistantReplies: Record<string, string> = {
   exams: "You have two upcoming examinations. Combined Mathematics is on 18 Sep at 09:00 AM, followed by Physics on 24 Sep at 02:00 PM.",
@@ -42,9 +50,9 @@ const assistantReplies: Record<string, string> = {
 };
 
 const translations = {
-  English: { overview: "Overview", learning: "My learning", examinations: "Examinations", progress: "Progress", shop: "Book shop", settings: "Settings", signIn: "Sign in to your space", createSpace: "Create your student space", welcome: "WELCOME BACK", continue: "Continue your learning journey.", notifications: "Notifications", profile: "View profile", assistant: "EduSmart assistant", support: "Here to help", ask: "Ask for support...", saved: "Settings saved", save: "Save settings", account: "ACCOUNT", preferences: "PREFERENCES", language: "Language" },
-  "සිංහල": { overview: "සමස්ත දසුන", learning: "මගේ ඉගෙනීම", examinations: "විභාග", progress: "ප්‍රගතිය", shop: "පොත් සාප්පුව", settings: "සැකසුම්", signIn: "ඔබේ අවකාශයට ඇතුළු වන්න", createSpace: "ඔබේ ශිෂ්‍ය අවකාශය සාදන්න", welcome: "ආයුබෝවන්", continue: "ඔබේ ඉගෙනුම් ගමන දිගටම කරගෙන යන්න.", notifications: "දැනුම්දීම්", profile: "පැතිකඩ බලන්න", assistant: "EduSmart සහායක", support: "උදව් කිරීමට සූදානම්", ask: "උදව් සඳහා විමසන්න...", saved: "සැකසුම් සුරකින ලදී", save: "සැකසුම් සුරකින්න", account: "ගිණුම", preferences: "මනාප", language: "භාෂාව" },
-  "தமிழ்": { overview: "மேலோட்டம்", learning: "என் கற்றல்", examinations: "பரீட்சைகள்", progress: "முன்னேற்றம்", shop: "புத்தகக் கடை", settings: "அமைப்புகள்", signIn: "உங்கள் இடத்தில் உள்நுழையுங்கள்", createSpace: "உங்கள் மாணவர் இடத்தை உருவாக்குங்கள்", welcome: "மீண்டும் வரவேற்கிறோம்", continue: "உங்கள் கற்றல் பயணத்தைத் தொடருங்கள்.", notifications: "அறிவிப்புகள்", profile: "சுயவிவரத்தைக் காண்க", assistant: "EduSmart உதவியாளர்", support: "உதவ தயாராக உள்ளது", ask: "உதவி கேளுங்கள்...", saved: "அமைப்புகள் சேமிக்கப்பட்டன", save: "அமைப்புகளைச் சேமி", account: "கணக்கு", preferences: "விருப்பங்கள்", language: "மொழி" },
+  English: { overview: "Overview", learning: "My learning", examinations: "Examinations", progress: "Progress", shop: "Book shop", settings: "Settings", signIn: "Sign in to your space", createSpace: "Create your student space", welcome: "WELCOME BACK", continue: "Continue your learning journey.", notifications: "Notifications", profile: "View profile", assistant: "E-mind assistant", support: "Here to help", ask: "Ask for support...", saved: "Settings saved", save: "Save settings", account: "ACCOUNT", preferences: "PREFERENCES", language: "Language" },
+  "සිංහල": { overview: "සමස්ත දසුන", learning: "මගේ ඉගෙනීම", examinations: "විභාග", progress: "ප්‍රගතිය", shop: "පොත් සාප්පුව", settings: "සැකසුම්", signIn: "ඔබේ අවකාශයට ඇතුළු වන්න", createSpace: "ඔබේ ශිෂ්‍ය අවකාශය සාදන්න", welcome: "ආයුබෝවන්", continue: "ඔබේ ඉගෙනුම් ගමන දිගටම කරගෙන යන්න.", notifications: "දැනුම්දීම්", profile: "පැතිකඩ බලන්න", assistant: "E-mind සහායක", support: "උදව් කිරීමට සූදානම්", ask: "උදව් සඳහා විමසන්න...", saved: "සැකසුම් සුරකින ලදී", save: "සැකසුම් සුරකින්න", account: "ගිණුම", preferences: "මනාප", language: "භාෂාව" },
+  "தமிழ்": { overview: "மேலோட்டம்", learning: "என் கற்றல்", examinations: "பரீட்சைகள்", progress: "முன்னேற்றம்", shop: "புத்தகக் கடை", settings: "அமைப்புகள்", signIn: "உங்கள் இடத்தில் உள்நுழையுங்கள்", createSpace: "உங்கள் மாணவர் இடத்தை உருவாக்குங்கள்", welcome: "மீண்டும் வரவேற்கிறோம்", continue: "உங்கள் கற்றல் பயணத்தைத் தொடருங்கள்.", notifications: "அறிவிப்புகள்", profile: "சுயவிவரத்தைக் காண்க", assistant: "E-mind உதவியாளர்", support: "உதவ தயாராக உள்ளது", ask: "உதவி கேளுங்கள்...", saved: "அமைப்புகள் சேமிக்கப்பட்டன", save: "அமைப்புகளைச் சேமி", account: "கணக்கு", preferences: "விருப்பங்கள்", language: "மொழி" },
 } as const;
 
 const pageTranslationRows = [
@@ -55,7 +63,7 @@ type ExamQuestion = { id: string; prompt: string; imageUrl?: string | null; opti
 type ExamReviewQuestion = { questionId: string; prompt: string; imageUrl?: string | null; optionImages?: (string | null)[]; options: string[]; selectedAnswer: string | null; correctAnswer: string; isCorrect: boolean };
 type ExamResult = { obtainedMarks: number; totalMarks: number; percentage: number; passed: boolean; review: ExamReviewQuestion[] };
 type ContentExam = { id: string; title: string; startsAt: string; durationMins: number; isQuiz?: boolean; subject: { name: string }; questions: ExamQuestion[] };
-type PublishedExam = { id: string; title: string; subject: string; date: string; time: string; duration: string; durationMins: number; tone: string; questions: ExamQuestion[]; fileName: string; isQuiz: boolean };
+type PublishedExam = { id: string; title: string; subject: string; startsAt: string; date: string; time: string; duration: string; durationMins: number; tone: string; questions: ExamQuestion[]; fileName: string; isQuiz: boolean };
 
 function mapContentExam(exam: ContentExam): PublishedExam {
   const start = new Date(exam.startsAt);
@@ -63,6 +71,7 @@ function mapContentExam(exam: ContentExam): PublishedExam {
     id: exam.id,
     title: exam.title,
     subject: exam.subject.name,
+    startsAt: exam.startsAt,
     date: start.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
     time: start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
     duration: `${exam.durationMins} min`,
@@ -135,7 +144,7 @@ export function AdminDashboard({ onSignOut }: { onSignOut: () => void }) {
   const [videoPublished, setVideoPublished] = useState(false);
   const sections = [["overview", "Overview", "⌂"], ["exams", "Exam papers", "▣"], ["books", "Books", "▤"], ["videos", "Videos", "▶"]] as const;
 
-  return <main className="admin-shell"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div><div className="admin-label">ADMIN CONSOLE</div><nav className="admin-nav" aria-label="Admin navigation">{sections.map(([section, label, icon]) => <button key={section} className={activeSection === section ? "active" : ""} onClick={() => setActiveSection(section)}><span>{icon}</span>{label}</button>)}</nav><button className="admin-signout" onClick={onSignOut}>Sign out <span>↗</span></button></aside><section className="admin-content"><header className="admin-topbar"><div><span className="eyebrow">EDUSMART SRI LANKA</span><h1>Content administration</h1></div><div className="admin-identity"><span className="admin-avatar">AD</span><div><strong>EduSmart Admin</strong><small>Full publishing access</small></div></div></header><div className="admin-page-content">{activeSection === "overview" && <><section className="admin-welcome"><div><p className="eyebrow">CONTROL CENTRE</p><h2>Keep the learning library moving.</h2><p>Only administrators can publish exam papers, books, and video lessons for students.</p></div><span className="admin-lock">⌘</span></section><section className="admin-stats"><div><span>LIVE EXAM PAPERS</span><strong>12</strong><small>2 drafts waiting</small></div><div><span>PUBLISHED BOOKS</span><strong>28</strong><small>4 added this month</small></div><div><span>VIDEO LESSONS</span><strong>46</strong><small>6 pending review</small></div></section><div className="admin-section-grid"><button className="admin-action-card" onClick={() => setActiveSection("exams")}><span className="admin-action-icon">▣</span><strong>Manage exam papers</strong><small>Upload papers, set schedules, and publish assessments.</small><span className="admin-action-link">Open manager →</span></button><button className="admin-action-card" onClick={() => setActiveSection("books")}><span className="admin-action-icon">▤</span><strong>Publish books</strong><small>Add trusted revision guides to the student book shop.</small><span className="admin-action-link">Open manager →</span></button><button className="admin-action-card" onClick={() => setActiveSection("videos")}><span className="admin-action-icon">▶</span><strong>Add video lessons</strong><small>Publish curated lessons to student learning spaces.</small><span className="admin-action-link">Open manager →</span></button></div></>}{activeSection === "exams" && <AdminForm title="Exam paper manager" description="Create and publish an assessment. Students can only see papers after you publish them." published={examPublished} onPublish={() => setExamPublished(true)} fields={["Paper title", "Subject", "Start date and time", "Duration"]} />}{activeSection === "books" && <AdminForm title="Book publishing" description="Add a revision guide to the student book shop when its details are ready." published={bookPublished} onPublish={() => setBookPublished(true)} fields={["Book title", "Author or publisher", "Subject", "Price"]} />}{activeSection === "videos" && <AdminForm title="Video lesson manager" description="Add a lesson link and publish it to the student learning library." published={videoPublished} onPublish={() => setVideoPublished(true)} fields={["Video title", "Video URL", "Subject", "Duration"]} />}</div></section></main>;
+  return <main className="admin-shell"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">e</span><span>E-mind</span></div><div className="admin-label">ADMIN CONSOLE</div><nav className="admin-nav" aria-label="Admin navigation">{sections.map(([section, label, icon]) => <button key={section} className={activeSection === section ? "active" : ""} onClick={() => setActiveSection(section)}><span>{icon}</span>{label}</button>)}</nav><button className="admin-signout" onClick={onSignOut}>Sign out <span>↗</span></button></aside><section className="admin-content"><header className="admin-topbar"><div><span className="eyebrow">E-mind SRI LANKA</span><h1>Content administration</h1></div><div className="admin-identity"><span className="admin-avatar">AD</span><div><strong>E-mind Admin</strong><small>Full publishing access</small></div></div></header><div className="admin-page-content">{activeSection === "overview" && <><section className="admin-welcome"><div><p className="eyebrow">CONTROL CENTRE</p><h2>Keep the learning library moving.</h2><p>Only administrators can publish exam papers, books, and video lessons for students.</p></div><span className="admin-lock">⌘</span></section><section className="admin-stats"><div><span>LIVE EXAM PAPERS</span><strong>12</strong><small>2 drafts waiting</small></div><div><span>PUBLISHED BOOKS</span><strong>28</strong><small>4 added this month</small></div><div><span>VIDEO LESSONS</span><strong>46</strong><small>6 pending review</small></div></section><div className="admin-section-grid"><button className="admin-action-card" onClick={() => setActiveSection("exams")}><span className="admin-action-icon">▣</span><strong>Manage exam papers</strong><small>Upload papers, set schedules, and publish assessments.</small><span className="admin-action-link">Open manager →</span></button><button className="admin-action-card" onClick={() => setActiveSection("books")}><span className="admin-action-icon">▤</span><strong>Publish books</strong><small>Add trusted revision guides to the student book shop.</small><span className="admin-action-link">Open manager →</span></button><button className="admin-action-card" onClick={() => setActiveSection("videos")}><span className="admin-action-icon">▶</span><strong>Add video lessons</strong><small>Publish curated lessons to student learning spaces.</small><span className="admin-action-link">Open manager →</span></button></div></>}{activeSection === "exams" && <AdminForm title="Exam paper manager" description="Create and publish an assessment. Students can only see papers after you publish them." published={examPublished} onPublish={() => setExamPublished(true)} fields={["Paper title", "Subject", "Start date and time", "Duration"]} />}{activeSection === "books" && <AdminForm title="Book publishing" description="Add a revision guide to the student book shop when its details are ready." published={bookPublished} onPublish={() => setBookPublished(true)} fields={["Book title", "Author or publisher", "Subject", "Price"]} />}{activeSection === "videos" && <AdminForm title="Video lesson manager" description="Add a lesson link and publish it to the student learning library." published={videoPublished} onPublish={() => setVideoPublished(true)} fields={["Video title", "Video URL", "Subject", "Duration"]} />}</div></section></main>;
 }
 
 type StudentProfile = {
@@ -188,6 +197,8 @@ export default function Home() {
   const [contentBooks, setContentBooks] = useState<BookCard[]>([]);
   const [contentExams, setContentExams] = useState<PublishedExam[]>([]);
   const [contentError, setContentError] = useState("");
+  const [landingStats, setLandingStats] = useState<LandingStats | null>(null);
+  const [landingStatsError, setLandingStatsError] = useState(false);
   const [writtenPapers, setWrittenPapers] = useState<PublishedWrittenPaper[]>([]);
   const [authView, setAuthView] = useState<"login" | "signup">("login");
   const [showAuthPanel, setShowAuthPanel] = useState(false);
@@ -202,6 +213,11 @@ export default function Home() {
   const [userRole, setUserRole] = useState<"student" | "admin" | null>(null);
   const [activeNav, setActiveNav] = useState("Overview");
   const [examOpen, setExamOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [activeExamId, setActiveExamId] = useState<string | null>(null);
   const [attemptDeadline, setAttemptDeadline] = useState<number | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -209,6 +225,7 @@ export default function Home() {
   const [seconds, setSeconds] = useState(0);
   const autoSubmitStarted = useRef(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answerSheetFile, setAnswerSheetFile] = useState<File | null>(null);
   const [examResult, setExamResult] = useState<ExamResult | null>(null);
   const [progressRefreshKey, setProgressRefreshKey] = useState(0);
   const [examError, setExamError] = useState("");
@@ -233,6 +250,15 @@ export default function Home() {
   const exams = publishedExam ? [publishedExam, ...contentExams] : contentExams;
   const quizExams = exams.filter((exam) => exam.isQuiz);
   const scheduledExams = exams.filter((exam) => !exam.isQuiz);
+  const learningCategories: LearningShowcaseCard[] = [
+    { title: "Exams", description: "Prepare for your next assessment with practice papers.", summary: `${scheduledExams.length + writtenPapers.length} available`, image: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&h=500&fit=crop", icon: "▣", destination: "Examinations", actionLabel: "Explore exams" },
+    { title: "Quiz", description: "Check your understanding with quick quizzes.", summary: `${quizExams.length} available`, image: "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=800&h=500&fit=crop", icon: "✓", destination: "Examinations", actionLabel: "Explore quizzes" },
+    { title: "Videos", description: "Watch lessons and revise at your own pace.", summary: `${contentVideos.length} lessons`, image: "https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=800&h=500&fit=crop", icon: "▶", destination: "My learning", actionLabel: "Explore videos" },
+    { title: "Books", description: "Find revision guides and resources for your subjects.", summary: `${contentBooks.length} resources`, image: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&h=500&fit=crop", icon: "▤", destination: "Book shop", actionLabel: "Browse books" },
+    { title: "Classes", description: "Live and guided learning sessions.", summary: "Coming soon", image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&h=500&fit=crop", icon: "⌂", destination: null, actionLabel: "Coming soon" },
+  ];
+  const calendarDays = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
+  const calendarStartOffset = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay();
   const languageOptions = ["English", "සිංහල", "தமிழ்"];
   const currentPortal = userRole === "admin" ? "admin" : "student";
   const cycleLanguage = () => setLanguage((current) => languageOptions[(languageOptions.indexOf(current) + 1) % languageOptions.length]);
@@ -241,16 +267,23 @@ export default function Home() {
     if (!activeExam) return;
     setExamError("");
     try {
-      const response = await fetch(`/api/exams/${activeExam.id}/submit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers: Object.entries(answers).map(([questionId, selectedAnswer]) => ({ questionId, answer: selectedAnswer })) }) });
+      const submittedAnswers = { answers: Object.entries(answers).map(([questionId, selectedAnswer]) => ({ questionId, answer: selectedAnswer })) };
+      const form = new FormData();
+      form.set("answers", JSON.stringify(submittedAnswers));
+      if (answerSheetFile) form.set("answerSheet", answerSheetFile);
+      const response = await fetch(`/api/exams/${activeExam.id}/submit`, answerSheetFile
+        ? { method: "POST", body: form }
+        : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(submittedAnswers) });
       const payload = await response.json() as ExamResult & { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "The exam could not be submitted.");
       setExamResult(payload);
+      setAnswerSheetFile(null);
       setProgressRefreshKey((current) => current + 1);
       setExamOpen(false);
     } catch (submitError) {
       setExamError(submitError instanceof Error ? submitError.message : "The exam could not be submitted.");
     }
-  }, [activeExam, answers]);
+  }, [activeExam, answers, answerSheetFile]);
 
   useEffect(() => {
     submitExamRef.current = submitExam;
@@ -262,6 +295,7 @@ export default function Home() {
     if (!resumingAttempt) setQuestion(0);
     setExamResult(null);
     setExamError("");
+    setAnswerSheetFile(null);
     setAttemptDeadline(null);
     autoSubmitStarted.current = false;
     try {
@@ -360,6 +394,7 @@ export default function Home() {
   };
 
   const googleCredentialHandler = useRef(handleGoogleCredential);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
   const googleInitialized = useRef(false);
   useEffect(() => {
     googleCredentialHandler.current = handleGoogleCredential;
@@ -367,28 +402,40 @@ export default function Home() {
 
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    const toggle = document.querySelector<HTMLElement>(".auth-toggle");
-    if (authenticated || authView !== "login" || !clientId || !toggle) return;
+    const button = googleButtonRef.current;
+    if (authenticated || !showAuthPanel || portal !== "student" || !clientId || !button) return;
 
-    const button = document.createElement("div");
-    button.className = "google-signin";
-    toggle.append(button);
     const renderButton = () => {
-      if (!window.google) return;
+      if (!window.google || !button.isConnected) return;
       if (!googleInitialized.current) {
         window.google.accounts.id.initialize({ client_id: clientId, callback: ({ credential }) => googleCredentialHandler.current(credential) });
         googleInitialized.current = true;
       }
-      window.google.accounts.id.renderButton(button, { theme: "outline", size: "large", width: 350 });
+      button.replaceChildren();
+      window.google.accounts.id.renderButton(button, { theme: "outline", size: "large", width: Math.min(350, Math.max(200, button.clientWidth)) });
     };
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.onload = renderButton;
-    document.head.append(script);
-    if (window.google) renderButton();
-    return () => { button.remove(); script.remove(); };
-  }, [authenticated, authView]);
+    const scriptUrl = "https://accounts.google.com/gsi/client";
+    let script = document.querySelector<HTMLScriptElement>(`script[src="${scriptUrl}"]`);
+    if (window.google) {
+      renderButton();
+      return;
+    }
+
+    const onLoad = () => renderButton();
+    const onError = () => setAuthError("Google sign-in could not load. Please try again or use your email and password.");
+    if (!script) {
+      script = document.createElement("script");
+      script.src = scriptUrl;
+      script.async = true;
+      document.head.append(script);
+    }
+    script.addEventListener("load", onLoad);
+    script.addEventListener("error", onError);
+    return () => {
+      script?.removeEventListener("load", onLoad);
+      script?.removeEventListener("error", onError);
+    };
+  }, [authenticated, authView, portal, showAuthPanel]);
 
   useEffect(() => {
     fetch("/api/auth", { cache: "no-store" }).then((response) => response.json()).then((payload: { user?: AuthResponseUser | null }) => {
@@ -400,6 +447,26 @@ export default function Home() {
       }
     }).catch(() => undefined);
   }, [router]);
+
+  useEffect(() => {
+    let current = true;
+    fetch("/api/stats", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Landing page statistics could not be loaded.");
+        const payload: unknown = await response.json();
+        if (!isLandingStats(payload)) throw new Error("Landing page statistics response was invalid.");
+        if (current) {
+          setLandingStats(payload);
+          setLandingStatsError(false);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("Landing page statistics could not be loaded:", error);
+        if (current) setLandingStatsError(true);
+      });
+
+    return () => { current = false; };
+  }, []);
 
   useEffect(() => {
     fetch("/api/content").then((response) => {
@@ -529,7 +596,7 @@ if (!authenticated) {
       <main className="landing-page">
         <nav className="landing-nav" role="navigation" aria-label="Main navigation">
           <div className="landing-nav-container">
-            <div className="landing-nav-brand"><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div>
+            <div className="landing-nav-brand"><span className="brand-mark">e</span><span>E-mind</span></div>
             <div className="landing-nav-links">
               <a href="#hero-title" className="landing-nav-link" onClick={(e) => { e.preventDefault(); document.getElementById('hero-title')?.scrollIntoView({ behavior: 'smooth' }); }}>Home</a>
               <a href="#features-title" className="landing-nav-link" onClick={(e) => { e.preventDefault(); document.getElementById('features-title')?.scrollIntoView({ behavior: 'smooth' }); }}>Resources</a>
@@ -554,11 +621,10 @@ if (!authenticated) {
                   <button className="landing-btn-secondary" onClick={() => { setPortal("student"); setAuthView("login"); setShowAuthPanel(true); }}>Login to your space</button>
                 </div>
                 <div className="landing-stats animate-fade-in-up delay-400">
-                  <div className="landing-stat-item"><div className="landing-stat-value">15K+</div><div className="landing-stat-label">Active Students</div></div>
-                  <div className="landing-stat-item"><div className="landing-stat-value">500+</div><div className="landing-stat-label">Practice Exams</div></div>
-                  <div className="landing-stat-item"><div className="landing-stat-value">94%</div><div className="landing-stat-label">Success Rate</div></div>
-                  <div className="landing-stat-item"><div className="landing-stat-value">24/7</div><div className="landing-stat-label">AI Support</div></div>
+                  <div className="landing-stat-item"><div className="landing-stat-value">{landingStats ? landingStats.activeStudents.toLocaleString() : landingStatsError ? "—" : "…"}</div><div className="landing-stat-label">Students active in last 30 days</div></div>
+                  <div className="landing-stat-item"><div className="landing-stat-value">{landingStats ? landingStats.practiceExams.toLocaleString() : landingStatsError ? "—" : "…"}</div><div className="landing-stat-label">Published practice exams</div></div>
                 </div>
+                {landingStatsError && <p className="landing-stats-error" role="status">Live statistics are temporarily unavailable.</p>}
                 <div className="landing-trust-badges animate-fade-in-up delay-500">
                   <span>Trusted by schools across Colombo, Kandy, Galle & Jaffna</span>
                   <div className="landing-trust-logos">
@@ -576,7 +642,7 @@ if (!authenticated) {
                     width={800}
                     height={600}
                     sizes="(max-width: 768px) 100vw, 580px"
-                    alt="Students learning with EduSmart" 
+                    alt="Students learning with E-mind"
                     className="hero-illustration"
                     loading="eager"
                   />
@@ -760,7 +826,7 @@ if (!authenticated) {
           <div className="landing-container">
             <div className="reveal" style={{ textAlign: 'center', maxWidth: '600px', margin: '0 auto 48px' }}>
               <span className="landing-hero-badge" style={{ background: '#dbeafe', color: '#3b82f6' }}>Video Demo</span>
-              <h2 id="demo-title" style={{ font: '800 clamp(32px, 4vw, 48px) Manrope, sans-serif', marginTop: '16px', marginBottom: '12px', color: 'var(--ink)' }}>See EduSmart in action</h2>
+              <h2 id="demo-title" style={{ font: '800 clamp(32px, 4vw, 48px) Manrope, sans-serif', marginTop: '16px', marginBottom: '12px', color: 'var(--ink)' }}>See E-mind in action</h2>
               <p style={{ fontSize: '18px', color: 'var(--muted)', lineHeight: 1.7 }}>Watch how students across Sri Lanka are transforming their learning experience.</p>
             </div>
             <div className="landing-video-demo reveal animate-fade-in-up">
@@ -772,7 +838,7 @@ if (!authenticated) {
                   <div className="video-duration">3:42</div>
                 </div>
                 <div className="video-info">
-                  <h3>EduSmart Platform Walkthrough</h3>
+                  <h3>E-mind Platform Walkthrough</h3>
                   <p>Complete platform tour showing personalized learning, AI assistant, exam practice, and progress tracking.</p>
                   <div className="video-stats">
                     <span>👁️ 125K+ views</span>
@@ -857,7 +923,7 @@ if (!authenticated) {
               </article>
               <article className="landing-testimonial reveal animate-fade-in-up delay-300">
                 <div className="landing-testimonial-stars">★★★★★</div>
-                <p className="landing-testimonial-text">&ldquo;As a teacher, I recommend EduSmart to all my students. The progress tracking and AI insights make my job so much easier.&rdquo;</p>
+                <p className="landing-testimonial-text">&ldquo;As a teacher, I recommend E-mind to all my students. The progress tracking and AI insights make my job so much easier.&rdquo;</p>
                 <div className="landing-testimonial-author">
                   <div className="landing-testimonial-avatar">RS</div>
                   <div><div className="landing-testimonial-name">Mrs. R. Silva</div><div className="landing-testimonial-role">A/L Teacher · Galle</div></div>
@@ -871,7 +937,7 @@ if (!authenticated) {
           <div className="landing-container">
             <div className="landing-cta-section reveal animate-fade-in-up">
               <h2 id="cta-title" className="landing-cta-title">Ready to accelerate your learning?</h2>
-              <p className="landing-cta-subtitle">Join 15,000+ Sri Lankan students already using EduSmart. Start free today.</p>
+              <p className="landing-cta-subtitle">Join 15,000+ Sri Lankan students already using E-mind. Start free today.</p>
               <div className="landing-cta-buttons">
                 <button className="landing-cta-btn-primary" onClick={() => { setPortal("student"); setAuthView("signup"); setShowAuthPanel(true); }}>Create Free Account</button>
                 <button className="landing-cta-btn-secondary" onClick={() => { setPortal("student"); setAuthView("login"); setShowAuthPanel(true); }}>Login to Continue</button>
@@ -882,15 +948,15 @@ if (!authenticated) {
 
         <footer className="landing-footer" role="contentinfo">
           <div className="landing-container">
-            <div className="landing-nav-brand" style={{ justifyContent: 'center', marginBottom: '16px' }}><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div>
+            <div className="landing-nav-brand" style={{ justifyContent: 'center', marginBottom: '16px' }}><span className="brand-mark">e</span><span>E-mind</span></div>
             <div className="landing-footer-links">
               <a href="#" className="landing-footer-link">About Us</a>
               <a href="#" className="landing-footer-link">Privacy Policy</a>
               <a href="#" className="landing-footer-link">Terms of Service</a>
               <a href="#" className="landing-footer-link">Contact</a>
             </div>
-            <p>© 2024 EduSmart Sri Lanka. All rights reserved.</p>
-            <p style={{ marginTop: '8px', fontSize: '12px' }}>EduSmart Sri Lanka · English · Sinhala · Tamil</p>
+            <p>© 2024 E-mind Sri Lanka. All rights reserved.</p>
+            <p style={{ marginTop: '8px', fontSize: '12px' }}>E-mind Sri Lanka · English · Sinhala · Tamil</p>
           </div>
         </footer>
 
@@ -949,6 +1015,16 @@ if (!authenticated) {
                        {subjectError && <p role="alert" style={{ margin: 0, color: "#b42318", fontSize: 13 }}>Choose at least one subject for your stream.</p>}
                      </div>
                    )}
+                   {portal === "student" && (
+                     <div className="google-auth-option">
+                       <div className="auth-divider"><span>or continue with</span></div>
+                       {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
+                         <div ref={googleButtonRef} className="google-signin" />
+                       ) : (
+                         <p className="google-config-message" role="status">Google sign-in is currently unavailable.</p>
+                       )}
+                     </div>
+                   )}
                    {authError && <p role="alert" style={{ margin: 0, color: "#b42318", fontSize: 13 }}>{authError}</p>}
                    {authMessage && <p role="status" style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>{authMessage}</p>}
                    <div className="auth-form-footer">
@@ -972,7 +1048,7 @@ if (!authenticated) {
     <main className="app-shell">
       {selectedVideo && <VideoPlayerModal video={selectedVideo} onClose={() => setSelectedVideo(null)} />}
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">e</span><span>edusmart<span className="brand-dot">.</span></span></div>
+        <div className="brand"><span className="brand-mark">e</span><span>E-mind</span></div>
         <div className="school-label">STUDENT SPACE</div>
         <nav className="nav-list" aria-label="Main navigation">
           { ["Overview", "My learning", "Examinations", "Progress", "Book shop"].map((item, index) => (
@@ -990,22 +1066,64 @@ if (!authenticated) {
         </div>
       </aside>
 
+      <nav className="mobile-dashboard-nav" aria-label="Main navigation">
+        {[
+          { item: "Overview", label: text.overview, icon: "⌂" },
+          { item: "My learning", label: text.learning, icon: "▣" },
+          { item: "Examinations", label: text.examinations, icon: "◷" },
+          { item: "Progress", label: text.progress, icon: "↗" },
+          { item: "Book shop", label: text.shop, icon: "▤" },
+          { item: "Settings", label: text.settings, icon: "⚙" },
+        ].map(({ item, label, icon }) => (
+          <button
+            key={item}
+            className={`nav-item ${activeNav === item ? "active" : ""}`}
+            onClick={() => setActiveNav(item)}
+            aria-current={activeNav === item ? "page" : undefined}
+          >
+            <span className="nav-icon" aria-hidden="true">{icon}</span>
+            <span className="mobile-dashboard-nav-label">{label}</span>
+          </button>
+        ))}
+      </nav>
+
       <section className="content-area">
-        <header className="topbar"><div className="mobile-brand">edusmart<span>.</span></div><div className="breadcrumb">Workspace <span>/</span> {activeNav === "Overview" ? text.overview : activeNav === "My learning" ? text.learning : activeNav === "Examinations" ? text.examinations : activeNav === "Progress" ? text.progress : activeNav === "Book shop" ? text.shop : text.settings}</div><div className="top-actions"><div className="notification-wrap"><button className="icon-button" aria-label={text.notifications} aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}>♧{unreadNotifications > 0 && <span className="notification-dot" />}</button>{notificationsOpen && <section className="notification-panel" role="dialog" aria-label={text.notifications}><div className="notification-head"><div><span className="eyebrow">YOUR UPDATES</span><h2>{text.notifications}</h2></div><button className="notification-close" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></div><div className="notification-list"><article className={unreadNotifications > 0 ? "notification-item unread" : "notification-item"}><span className="notification-symbol">◷</span><div><strong>Physics exam reminder</strong><p>Your Unit 04 examination is on 24 Sep at 02:00 PM.</p><small>Today</small></div></article><article className={unreadNotifications > 1 ? "notification-item unread" : "notification-item"}><span className="notification-symbol">✦</span><div><strong>New learning insight</strong><p>You are close to mastering Physics. Keep practising vectors.</p><small>Yesterday</small></div></article></div><button className="mark-read-button" onClick={() => setUnreadNotifications(0)}>{unreadNotifications > 0 ? "Mark all as read" : "All caught up"}</button></section>}</div><button className="top-avatar" onClick={() => setProfileOpen(true)} aria-label="Open profile">{getInitials(profile.fullName)}</button></div></header>
+        <header className="topbar"><div className="mobile-brand">E-mind<span>.</span></div><div className="breadcrumb">Workspace <span>/</span> {activeNav === "Overview" ? text.overview : activeNav === "My learning" ? text.learning : activeNav === "Examinations" ? text.examinations : activeNav === "Progress" ? text.progress : activeNav === "Book shop" ? text.shop : text.settings}</div><div className="top-actions"><div className="notification-wrap"><button className="icon-button" aria-label={text.notifications} aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}>♧{unreadNotifications > 0 && <span className="notification-dot" />}</button>{notificationsOpen && <section className="notification-panel" role="dialog" aria-label={text.notifications}><div className="notification-head"><div><span className="eyebrow">YOUR UPDATES</span><h2>{text.notifications}</h2></div><button className="notification-close" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">×</button></div><div className="notification-list"><article className={unreadNotifications > 0 ? "notification-item unread" : "notification-item"}><span className="notification-symbol">◷</span><div><strong>Physics exam reminder</strong><p>Your Unit 04 examination is on 24 Sep at 02:00 PM.</p><small>Today</small></div></article><article className={unreadNotifications > 1 ? "notification-item unread" : "notification-item"}><span className="notification-symbol">✦</span><div><strong>New learning insight</strong><p>You are close to mastering Physics. Keep practising vectors.</p><small>Yesterday</small></div></article></div><button className="mark-read-button" onClick={() => setUnreadNotifications(0)}>{unreadNotifications > 0 ? "Mark all as read" : "All caught up"}</button></section>}</div><button className="top-avatar" onClick={() => setProfileOpen(true)} aria-label="Open profile">{getInitials(profile.fullName)}</button></div></header>
         <div className="page-content">
           {activeNav === "Overview" && <>
           <section className="welcome-row"><div><p className="eyebrow">THURSDAY, 10 SEPTEMBER 2026</p><h1>Good morning, {profile.fullName} <span>✦</span></h1><p className="subtitle">A little progress every day adds up to big results.</p></div><button className="outline-button" onClick={() => setProfileOpen(true)}>View profile <span>↗</span></button></section>
 
-          <section className="stats-grid">
-            <div className="stat-card accent"><div className="stat-label">LEARNING STREAK <span>↗</span></div><div className="stat-value">12 <small>days</small></div><div className="stat-foot"><span className="sparkline">╱╲╱╲╱╱╲</span> +3 from last week</div></div>
-            <div className="stat-card"><div className="stat-label">AVG. PERFORMANCE <span>↗</span></div><div className="stat-value">78<small>%</small></div><div className="stat-foot"><span className="up">↑ 6.4%</span> from last month</div></div>
-            <div className="stat-card"><div className="stat-label">HOURS LEARNED <span>↗</span></div><div className="stat-value">24<small>h</small> <em>18m</em></div><div className="stat-foot">Goal: 30h this month</div></div>
+          <section className="section-heading"><div><p className="eyebrow">CURATED FOR YOUR PROFILE</p><h2>Keep learning</h2></div><button className="text-button" onClick={() => setActiveNav("My learning")}>See all recommendations <span>→</span></button></section>
+          <section className="learning-showcase" aria-label="Learning recommendations">
+            <div className="learning-category-grid">
+              {learningCategories.map((category) => (
+                <article className={`learning-category-card${category.destination ? "" : " coming-soon"}`} key={category.title}>
+                  <div className="learning-category-art" style={{ backgroundImage: `linear-gradient(180deg, rgba(20, 47, 41, .06), rgba(20, 47, 41, .52)), url("${category.image}")` }}>
+                    <span className="learning-category-icon" aria-hidden="true">{category.icon}</span>
+                    <span className="learning-category-summary">{category.summary}</span>
+                  </div>
+                  <div className="learning-category-copy">
+                    <h3>{category.title}</h3>
+                    <p>{category.description}</p>
+                    {category.destination
+                      ? <button className="learning-category-link" onClick={() => { if (category.destination) setActiveNav(category.destination); }}>{category.actionLabel}<span aria-hidden="true">→</span></button>
+                      : <span className="learning-category-status">{category.actionLabel}</span>}
+                  </div>
+                </article>
+              ))}
+            </div>
           </section>
 
-          <section className="section-heading"><div><p className="eyebrow">CURATED FOR YOUR PROFILE</p><h2>Keep learning</h2></div><button className="text-button">See all recommendations <span>→</span></button></section>
-          <section className="video-grid">{contentVideos.map((video) => <article className="video-card" key={video.id}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</section>
+          <section className="learning-tracker" aria-labelledby="learning-tracker-title">
+            <div className="section-heading"><div><p className="eyebrow">YOUR LEARNING JOURNEY</p><h2 id="learning-tracker-title">Progress at a glance</h2></div></div>
+            <section className="stats-grid" aria-label="Learning progress">
+              <div className="stat-card accent"><div className="stat-label">LEARNING STREAK <span>↗</span></div><div className="stat-value">12 <small>days</small></div><div className="stat-foot"><span className="sparkline">╱╲╱╲╱╱╲</span> +3 from last week</div></div>
+              <div className="stat-card"><div className="stat-label">AVG. PERFORMANCE <span>↗</span></div><div className="stat-value">78<small>%</small></div><div className="stat-foot"><span className="up">↑ 6.4%</span> from last month</div></div>
+              <div className="stat-card"><div className="stat-label">HOURS LEARNED <span>↗</span></div><div className="stat-value">24<small>h</small> <em>18m</em></div><div className="stat-foot">Goal: 30h this month</div></div>
+            </section>
+          </section>
 
-          <div className="lower-grid"><section><div className="section-heading compact"><div><p className="eyebrow">STAY ON TRACK</p><h2>Upcoming examinations</h2></div><button className="text-button">View calendar <span>→</span></button></div><div className="exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.id}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="arrow-button" onClick={() => openExam(exam)} aria-label={`Open ${exam.title}`}>↗</button></article>)}</div></section><section className="progress-panel"><div className="section-heading compact"><div><p className="eyebrow">YOUR PROGRESS</p><h2>Subject strengths</h2></div><button className="more-button">•••</button></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></div>
+          <div className="lower-grid"><section><div className="section-heading compact"><div><p className="eyebrow">STAY ON TRACK</p><h2>Upcoming examinations</h2></div><button className="text-button" onClick={() => setCalendarOpen(true)}>View calendar <span>→</span></button></div><div className="exam-list">{exams.map((exam) => <article className={`exam-row ${exam.tone}`} key={exam.id}><div className="date-block"><strong>{exam.date.split(" ")[0]}</strong><span>{exam.date.split(" ")[1]}</span></div><div className="exam-info"><span className="subject-tag">{exam.subject}</span><h3>{exam.title}</h3><p>{exam.time} <span>·</span> {exam.duration}</p></div><button className="arrow-button" onClick={() => openExam(exam)} aria-label={`Open ${exam.title}`}>↗</button></article>)}{writtenPapers.map((paper) => <article className="exam-row mint" key={`paper-${paper.id}`}><div className="date-block"><strong>PDF</strong><span>PAPER</span></div><div className="exam-info"><span className="subject-tag">{paper.subject} · Written paper</span><h3>{paper.title}</h3><p>{paper.durationMins} min <span>·</span> Essay / structured practice</p></div><button className="arrow-button" onClick={() => setActiveNav("Examinations")} aria-label={`Open ${paper.title} written paper`}>↗</button></article>)}{exams.length === 0 && writtenPapers.length === 0 && <p className="admin-empty">No upcoming exams or written papers have been published yet.</p>}</div></section><section className="progress-panel"><div className="section-heading compact"><div><p className="eyebrow">YOUR PROGRESS</p><h2>Subject strengths</h2></div><button className="more-button">•••</button></div><div className="progress-bars"><div className="progress-item"><div><span>Biology</span><strong>84%</strong></div><div className="bar"><i style={{ width: "84%", background: "#2a8c73" }} /></div></div><div className="progress-item"><div><span>Chemistry</span><strong>76%</strong></div><div className="bar"><i style={{ width: "76%", background: "#dfa53e" }} /></div></div><div className="progress-item"><div><span>Physics</span><strong>68%</strong></div><div className="bar"><i style={{ width: "68%", background: "#9b6eaa" }} /></div></div></div><div className="insight"><span>✦</span><p><strong>AI insight</strong><br />You&apos;re close to mastering Physics. Focus on <u>vectors</u> next.</p></div></section></div>
           </>}
 
           {activeNav === "My learning" && <section className="nav-page"><div className="section-heading"><div><p className="eyebrow">YOUR PERSONALISED LIBRARY</p><h1>My learning</h1><p className="subtitle">Pick up where you left off and keep your momentum going.</p></div></div><div className="learning-summary"><div><span className="eyebrow">CURRENT FOCUS</span><h2>Physics · Vectors</h2><p>68% complete · 3 lessons remaining</p></div><button className="primary-button">Continue learning <span>→</span></button></div><div className="video-grid">{contentVideos.map((video) => <article className="video-card" key={video.id}><div className="video-art" style={{ backgroundImage: `url(${video.image})`, backgroundColor: video.color }}><span className="video-duration">{video.duration}</span><button className="play-button" aria-label={`Play ${video.title}`}>▶</button></div><div className="video-copy"><div className="video-meta"><span>{video.subject}</span><span>{video.level}</span></div><h3>{video.title}</h3><button className="watch-button">Start watching <span>↗</span></button></div></article>)}</div></section>}
@@ -1036,16 +1154,17 @@ if (!authenticated) {
           {activeNav === "Examinations" && <section className="nav-page written-paper-student-list"><div className="section-heading"><div><p className="eyebrow">ESSAY AND STRUCTURED PRACTICE</p><h2>Question papers</h2><p className="subtitle">Start the exam to begin its timer, then upload your scanned answer paper before time runs out.</p></div></div>{writtenPapers.length === 0 ? <p className="admin-empty">No essay or structured question papers have been published yet.</p> : <div className="written-paper-student-grid">{writtenPapers.map((paper) => <article className="written-paper-student-card" key={paper.id}><div className="written-paper-card-top"><div><span className="subject-tag">{paper.subject} &middot; {paper.educationLevel === "GRADE" ? `Grade${paper.grade ? ` ${paper.grade}` : ""}` : paper.educationLevel === "A_LEVEL" ? "A Level" : "O Level"}{paper.stream ? ` &middot; ${paper.stream}` : ""}</span><h3>{paper.title}</h3><p>{paper.fileName}{paper.fileName.toLowerCase().endsWith(".docx") ? " · Download to open this Word document." : ""}</p></div><a className="primary-button" href={`/api/written-papers/${paper.id}/download`}>Download question paper</a></div>{paper.fileName.toLowerCase().endsWith(".pdf") && <iframe className="written-paper-preview" src={`/api/written-papers/${paper.id}/download?inline=1`} title={`${paper.title} question paper`} />}<WrittenPaperAttempt paper={paper} /></article>)}</div>}</section>}
           {activeNav === "Progress" && <StudentProgress refreshKey={progressRefreshKey} />}
 
-          {activeNav === "Book shop" && <section className="nav-page shop-page"><div className="section-heading"><div><p className="eyebrow">STUDY MATERIALS FOR YOUR JOURNEY</p><h1>Book shop</h1><p className="subtitle">Get trusted revision guides and practice papers delivered to you.</p></div><button className="basket-button" onClick={() => setBasket([])} aria-label="Clear basket">Basket <span>{basket.length}</span></button></div><div className="book-grid">{contentBooks.map((book) => { const inBasket = basket.includes(book.title); return <article className={`book-card ${book.color}`} key={book.id}><div className="book-cover" style={book.imageUrl ? { backgroundImage: `url(${book.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}><span>{book.level}</span><strong>{book.subject}</strong><i>EduSmart<br />Study Series</i></div><div className="book-copy"><div className="book-meta"><span>{book.subject}</span><span>{book.level}</span></div><h2>{book.title}</h2><p>by {book.author}</p><div className="book-purchase"><strong>{book.price}</strong><button className={inBasket ? "added-button" : "primary-button"} onClick={() => setBasket((current) => inBasket ? current.filter((title) => title !== book.title) : [...current, book.title])}>{inBasket ? "Added ✓" : "Add to basket"}</button></div></div></article>; })}</div>{basket.length > 0 && <div className="basket-bar"><div><strong>{basket.length} {basket.length === 1 ? "book" : "books"} in your basket</strong><span>Ready for checkout</span></div><button className="primary-button" onClick={() => { setBasket([]); window.alert("Your order has been placed successfully."); }}>Checkout <span>→</span></button></div>}</section>}
+          {activeNav === "Book shop" && <section className="nav-page shop-page"><div className="section-heading"><div><p className="eyebrow">STUDY MATERIALS FOR YOUR JOURNEY</p><h1>Book shop</h1><p className="subtitle">Get trusted revision guides and practice papers delivered to you.</p></div><button className="basket-button" onClick={() => setBasket([])} aria-label="Clear basket">Basket <span>{basket.length}</span></button></div><div className="book-grid">{contentBooks.map((book) => { const inBasket = basket.includes(book.title); return <article className={`book-card ${book.color}`} key={book.id}><div className="book-cover" style={book.imageUrl ? { backgroundImage: `url(${book.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}><span>{book.level}</span><strong>{book.subject}</strong><i>E-mind<br />Study Series</i></div><div className="book-copy"><div className="book-meta"><span>{book.subject}</span><span>{book.level}</span></div><h2>{book.title}</h2><p>by {book.author}</p><div className="book-purchase"><strong>{book.price}</strong><button className={inBasket ? "added-button" : "primary-button"} onClick={() => setBasket((current) => inBasket ? current.filter((title) => title !== book.title) : [...current, book.title])}>{inBasket ? "Added ✓" : "Add to basket"}</button></div></div></article>; })}</div>{basket.length > 0 && <div className="basket-bar"><div><strong>{basket.length} {basket.length === 1 ? "book" : "books"} in your basket</strong><span>Ready for checkout</span></div><button className="primary-button" onClick={() => { setBasket([]); window.alert("Your order has been placed successfully."); }}>Checkout <span>→</span></button></div>}</section>}
 
           {activeNav === "Settings" && <section className="nav-page settings-page"><div className="section-heading"><div><p className="eyebrow">PERSONALISE YOUR SPACE</p><h1>Settings</h1><p className="subtitle">Manage your learning preferences and account experience.</p></div></div><div className="settings-grid"><section className="settings-card"><div className="settings-card-heading"><div><p className="eyebrow">ACCOUNT</p><h2>Profile details</h2></div><span className="settings-avatar">NS</span></div><label>Full name<input defaultValue="Nethmi Silva" /></label><label>Email address<input defaultValue="nethmi.silva@example.com" type="email" /></label><div className="profile-two-col"><label>District<select defaultValue="Colombo"><option>Colombo</option><option>Kandy</option><option>Galle</option><option>Jaffna</option></select></label><label>Language<select value={language} onChange={(event) => { setLanguage(event.target.value); setSettingsSaved(false); }}><option>English</option><option>සිංහල</option><option>தமிழ்</option></select></label></div></section><section className="settings-card"><div className="settings-card-heading"><div><p className="eyebrow">PREFERENCES</p><h2>Learning experience</h2></div></div><label className="setting-toggle"><span><strong>Study reminders</strong><small>Receive notifications about upcoming exams and goals.</small></span><input type="checkbox" checked={notificationsEnabled} onChange={(event) => { setNotificationsEnabled(event.target.checked); setSettingsSaved(false); }} /></label><label className="setting-toggle"><span><strong>Compact layout</strong><small>Fit more learning information on your dashboard.</small></span><input type="checkbox" checked={compactLayout} onChange={(event) => { setCompactLayout(event.target.checked); setSettingsSaved(false); }} /></label><div className="settings-actions"><span>{settingsSaved ? "Settings saved" : "Changes are saved for this session"}</span><button className="primary-button" onClick={() => setSettingsSaved(true)}>Save settings <span>✓</span></button></div></section></div></section>}
         </div>
       </section>
 
-      {examOpen && activeExam && questions[question] && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">{activeExam.subject}</span><h2 id="exam-title">{activeExam.title}</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body" tabIndex={0} aria-label="Question and answer choices"><div className="question-number">{String(question + 1).padStart(2, "0")}</div><div className="question-content"><h3>{questions[question].prompt}</h3>{questions[question].imageUrl && <Image className="student-question-image" src={questions[question].imageUrl} alt={`Image for question ${question + 1}`} width={1200} height={800} unoptimized />}{questions[question].options.map((option, optionIndex) => { const key = String.fromCharCode(65 + optionIndex); const optionImage = questions[question].optionImages?.[optionIndex]; return <label key={key}><input type="radio" name={`answer-${questions[question].id}`} checked={answers[questions[question].id] === key} onChange={() => setAnswers((current) => ({ ...current, [questions[question].id]: key }))} /> <span>{key}</span> {option}{optionImage && <Image className="student-option-image" src={optionImage} alt={`Option ${key}`} width={800} height={600} unoptimized />}</label>; })}</div></div><div className="exam-modal-bottom"><span>{examError || "Submit before the timer ends to save your answers."}</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => setQuestion(question + 1)}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => void submitExam()}>Submit exam <span>✓</span></button>}</div></div></section></div>}
+      {examOpen && activeExam && questions[question] && <div className="modal-backdrop"><section className="exam-modal" role="dialog" aria-modal="true" aria-labelledby="exam-title"><div className="exam-modal-top"><div><span className="subject-tag">{activeExam.subject}</span><h2 id="exam-title">{activeExam.title}</h2></div><button className="close-button" onClick={() => setExamOpen(false)} aria-label="Close examination">×</button></div><div className="timer-strip"><span>TIME REMAINING</span><strong>{formattedTime}</strong><span>QUESTION {question + 1} OF {questions.length}</span></div><div className="question-body" tabIndex={0} aria-label="Question and answer choices"><div className="question-number">{String(question + 1).padStart(2, "0")}</div><div className="question-content"><h3>{questions[question].prompt}</h3>{questions[question].imageUrl && <Image className="student-question-image" src={questions[question].imageUrl} alt={`Image for question ${question + 1}`} width={1200} height={800} unoptimized />}{questions[question].options.map((option, optionIndex) => { const key = String.fromCharCode(65 + optionIndex); const optionImage = questions[question].optionImages?.[optionIndex]; return <label key={key}><input type="radio" name={`answer-${questions[question].id}`} checked={answers[questions[question].id] === key} onChange={() => setAnswers((current) => ({ ...current, [questions[question].id]: key }))} /> <span>{key}</span> {option}{optionImage && <Image className="student-option-image" src={optionImage} alt={`Option ${key}`} width={800} height={600} unoptimized />}</label>; })}</div></div><label className="written-paper-file">Answer sheet document (optional)<input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file && file.size > 15 * 1024 * 1024) { setExamError("The answer sheet must be no larger than 15 MB."); setAnswerSheetFile(null); event.target.value = ""; return; } setAnswerSheetFile(file); setExamError(""); }} /><small>{answerSheetFile ? `${answerSheetFile.name} is ready to submit.` : "Optional PDF or image, up to 15 MB. It will be sent with your online answers."}</small></label><div className="exam-modal-bottom"><span>{examError || "Submit before the timer ends to save your answers."}</span><div><button className="secondary-button" onClick={() => setQuestion(Math.max(question - 1, 0))}>Previous</button>{question < questions.length - 1 ? <button className="primary-button" onClick={() => setQuestion(question + 1)}>Next question <span>→</span></button> : <button className="primary-button" onClick={() => void submitExam()}>Submit exam <span>✓</span></button>}</div></div></section></div>}
+      {calendarOpen && <div className="modal-backdrop" onClick={() => setCalendarOpen(false)}><section className="exam-modal exam-calendar-modal" role="dialog" aria-modal="true" aria-labelledby="calendar-title" onClick={(event) => event.stopPropagation()}><div className="exam-modal-top"><div><span className="eyebrow">SCHEDULED ASSESSMENTS</span><h2 id="calendar-title">Exam calendar</h2></div><button className="close-button" onClick={() => setCalendarOpen(false)} aria-label="Close calendar">×</button></div><div className="calendar-month-controls"><button className="secondary-button" onClick={() => setCalendarMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Previous month">←</button><strong>{calendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</strong><button className="secondary-button" onClick={() => setCalendarMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Next month">→</button></div><div className="calendar-grid" role="grid" aria-label={calendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}><div className="calendar-weekday">Sun</div><div className="calendar-weekday">Mon</div><div className="calendar-weekday">Tue</div><div className="calendar-weekday">Wed</div><div className="calendar-weekday">Thu</div><div className="calendar-weekday">Fri</div><div className="calendar-weekday">Sat</div>{Array.from({ length: calendarStartOffset }, (_, index) => <div className="calendar-day empty" key={`empty-${index}`} />)}{Array.from({ length: calendarDays }, (_, index) => { const day = index + 1; const dayExams = scheduledExams.filter((exam) => { const start = new Date(exam.startsAt); return start.getFullYear() === calendarMonth.getFullYear() && start.getMonth() === calendarMonth.getMonth() && start.getDate() === day; }); return <div className={`calendar-day${dayExams.length ? " has-exam" : ""}`} key={day}><span>{day}</span>{dayExams.map((exam) => <button className="calendar-exam" key={exam.id} onClick={() => { setCalendarOpen(false); openExam(exam); }} title={`${exam.title} · ${exam.time}`}>{exam.title}</button>)}</div>; })}</div>{scheduledExams.length === 0 && <p className="admin-empty">No scheduled exams are available yet. Published written papers appear in the examinations section.</p>}</section></div>}
       {examResult && <div className="modal-backdrop"><section className="exam-modal exam-result-modal" role="dialog" aria-modal="true" aria-labelledby="result-title"><div className="exam-modal-top"><div><span className="subject-tag">EXAM RESULT</span><h2 id="result-title">{activeExam?.title}</h2></div><button className="close-button" onClick={() => setExamResult(null)} aria-label="Close result">×</button></div><div className="question-body"><div className="question-number">{Math.round(examResult.percentage)}%</div><div className="question-content"><h3>{examResult.percentage < 70 ? `Let's strengthen ${activeExam?.subject ?? "this subject"}.` : examResult.passed ? "Congratulations, you passed." : "Keep practising and try again."}</h3><p>You scored {examResult.obtainedMarks} of {examResult.totalMarks} marks ({examResult.percentage}%). {examResult.percentage < 70 ? "Your Progress page has practice suggestions based on your scores." : "Your result is saved to your Progress page."}</p></div></div><section className="exam-review-sheet" aria-label="Exam answer review"><h3>Answer review</h3>{examResult.review.map((item, index) => { const selectedIndex = item.selectedAnswer ? item.selectedAnswer.charCodeAt(0) - 65 : -1; const correctIndex = item.correctAnswer.charCodeAt(0) - 65; return <article className="exam-review-question" key={item.questionId}><div className="exam-review-heading"><strong>Question {String(index + 1).padStart(2, "0")}</strong><span className={item.isCorrect ? "review-correct" : "review-incorrect"}>{item.isCorrect ? "Correct" : "Incorrect"}</span></div><h4>{item.prompt}</h4>{item.imageUrl && <Image className="student-question-image" src={item.imageUrl} alt={`Image for question ${index + 1}`} width={1200} height={800} unoptimized />}<p className={item.isCorrect ? "review-correct" : "review-incorrect"}><strong>Your answer:</strong> {selectedIndex >= 0 ? `${item.selectedAnswer}: ${item.options[selectedIndex]}` : "Not answered"}</p><p className="review-correct"><strong>Correct answer:</strong> {item.correctAnswer}: {item.options[correctIndex]}</p></article>; })}</section><div className="exam-modal-bottom"><span>Saved to your examination results.</span><button className="primary-button" onClick={() => setExamResult(null)}>Done</button></div></section></div>}
       {profileOpen && <ProfileModal profile={profile} onClose={() => setProfileOpen(false)} onSignOut={async () => { setProfileOpen(false); await handleSignOut(); }} />}
-      {authenticated && <div className="assistant-widget"><button className="assistant-launcher" onClick={() => setAssistantOpen((open) => !open)} aria-label={assistantOpen ? "Close EduSmart assistant" : "Open EduSmart assistant"}>{assistantOpen ? "×" : "✦"}<span className="assistant-pulse" /></button>{assistantOpen && <section className="assistant-panel" role="dialog" aria-label="EduSmart support assistant"><div className="assistant-head"><div><span className="assistant-avatar">✦</span><div><strong>EduSmart assistant</strong><small>Here to help</small></div></div><button onClick={() => setAssistantOpen(false)} aria-label="Close assistant">×</button></div><div className="assistant-messages">{assistantMessages.map((message, index) => <p className={`assistant-message ${message.from}`} key={`${message.from}-${index}`}>{message.text}</p>)}</div><div className="assistant-quick-actions"><button onClick={() => askAssistant("exams", "Show my exams")}>My exams</button><button onClick={() => askAssistant("learning", "Help with learning")}>Learning help</button><button onClick={() => askAssistant("books", "Where are the books?")}>Book shop</button></div><form className="assistant-form" onSubmit={submitAssistantMessage}><input value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Ask for support..." aria-label="Ask the assistant" /><button type="submit" aria-label="Send message">↑</button></form></section>}</div>}
+      {authenticated && <div className="assistant-widget"><button className="assistant-launcher" onClick={() => setAssistantOpen((open) => !open)} aria-label={assistantOpen ? "Close E-mind assistant" : "Open E-mind assistant"}>{assistantOpen ? "×" : "✦"}<span className="assistant-pulse" /></button>{assistantOpen && <section className="assistant-panel" role="dialog" aria-label="E-mind support assistant"><div className="assistant-head"><div><span className="assistant-avatar">✦</span><div><strong>E-mind assistant</strong><small>Here to help</small></div></div><button onClick={() => setAssistantOpen(false)} aria-label="Close assistant">×</button></div><div className="assistant-messages">{assistantMessages.map((message, index) => <p className={`assistant-message ${message.from}`} key={`${message.from}-${index}`}>{message.text}</p>)}</div><div className="assistant-quick-actions"><button onClick={() => askAssistant("exams", "Show my exams")}>My exams</button><button onClick={() => askAssistant("learning", "Help with learning")}>Learning help</button><button onClick={() => askAssistant("books", "Where are the books?")}>Book shop</button></div><form className="assistant-form" onSubmit={submitAssistantMessage}><input value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Ask for support..." aria-label="Ask the assistant" /><button type="submit" aria-label="Send message">↑</button></form></section>}</div>}
     </main>
   );
 }

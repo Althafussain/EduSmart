@@ -48,7 +48,7 @@ export async function GET(request: Request, context: { params: Promise<{ resourc
   const resource = resourceName((await context.params).resource);
   if (!resource) return NextResponse.json({ error: "Unknown admin resource." }, { status: 404 });
 
-  if (resource === "users") return NextResponse.json({ items: await prisma.user.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, email: true, fullName: true, role: true, educationLevel: true, stream: true, createdAt: true } }) });
+  if (resource === "users") return NextResponse.json({ items: await prisma.user.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, email: true, fullName: true, mobileNumber: true, role: true, educationLevel: true, stream: true, createdAt: true } }) });
   if (resource === "books") return NextResponse.json({ items: await prisma.book.findMany({ orderBy: { createdAt: "desc" } }) });
   if (resource === "videos") return NextResponse.json({ items: await prisma.video.findMany({ orderBy: { createdAt: "desc" } }) });
   const exams = await prisma.exam.findMany({
@@ -59,8 +59,8 @@ export async function GET(request: Request, context: { params: Promise<{ resourc
       attempts: {
         orderBy: { startedAt: "desc" },
         select: {
-          id: true, status: true, startedAt: true, submittedAt: true, expiresAt: true,
-          user: { select: { id: true, fullName: true, email: true } },
+          id: true, status: true, startedAt: true, submittedAt: true, expiresAt: true, answerFileName: true,
+          user: { select: { id: true, fullName: true, email: true, mobileNumber: true } },
           result: { select: { obtainedMarks: true, totalMarks: true, percentage: true, passed: true } },
         },
       },

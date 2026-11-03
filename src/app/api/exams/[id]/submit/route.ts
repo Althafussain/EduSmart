@@ -7,6 +7,17 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 
 type SubmittedAnswer = { questionId?: unknown; answer?: unknown };
+const maxAnswerSize = 15 * 1024 * 1024;
+const allowedAnswerFile = /\.(pdf|png|jpe?g|webp)$/i;
+
+function answerMimeType(file: File) {
+  const extension = file.name.toLowerCase().split(".").pop();
+  if (extension === "pdf") return "application/pdf";
+  if (extension === "png") return "image/png";
+  if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
+  if (extension === "webp") return "image/webp";
+  return null;
+}
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getMongoUser();
@@ -15,14 +26,37 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   const { id: examId } = await context.params;
-  let body: { answers?: unknown };
+  let submittedAnswers: SubmittedAnswer[];
+  let attachment: { fileName: string; mimeType: string; document: Buffer } | null = null;
+  const contentType = request.headers.get("content-type") ?? "";
   try {
-    body = await request.json() as { answers?: unknown };
+    if (contentType.includes("multipart/form-data")) {
+      const form = await request.formData();
+      const answersValue = form.get("answers");
+      if (typeof answersValue !== "string") {
+        return NextResponse.json({ error: "Submit the exam answers as JSON." }, { status: 400 });
+      }
+      const body = JSON.parse(answersValue) as { answers?: unknown };
+      submittedAnswers = Array.isArray(body.answers) ? body.answers as SubmittedAnswer[] : [];
+      const file = form.get("answerSheet");
+      if (file !== null) {
+        if (!(file instanceof File) || !allowedAnswerFile.test(file.name)) {
+          return NextResponse.json({ error: "Upload an answer sheet as a PDF or image (PNG, JPG, or WEBP)." }, { status: 415 });
+        }
+        if (file.size < 1 || file.size > maxAnswerSize) {
+          return NextResponse.json({ error: "The answer sheet must be larger than 0 bytes and no larger than 15 MB." }, { status: 413 });
+        }
+        const mimeType = answerMimeType(file);
+        if (!mimeType) return NextResponse.json({ error: "The answer sheet file type is not supported." }, { status: 415 });
+        attachment = { fileName: file.name, mimeType, document: Buffer.from(await file.arrayBuffer()) };
+      }
+    } else {
+      const body = await request.json() as { answers?: unknown };
+      submittedAnswers = Array.isArray(body.answers) ? body.answers as SubmittedAnswer[] : [];
+    }
   } catch {
-    return NextResponse.json({ error: "Submit the exam answers as JSON." }, { status: 400 });
+    return NextResponse.json({ error: "Submit valid exam answers and an optional answer sheet." }, { status: 400 });
   }
-
-  const submittedAnswers = Array.isArray(body.answers) ? body.answers as SubmittedAnswer[] : [];
   const exam = await prisma.exam.findFirst({
     where: { id: examId, published: true },
     include: { questions: { orderBy: { id: "asc" } } },
@@ -70,7 +104,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
       await transaction.studentAnswer.deleteMany({ where: { attemptId: attempt.id } });
       await transaction.studentAnswer.createMany({ data: gradedAnswers });
-      await transaction.examAttempt.update({ where: { id: attempt.id }, data: { status: now > attempt.expiresAt ? "EXPIRED" : "SUBMITTED", submittedAt: now } });
+      await transaction.examAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          status: now > attempt.expiresAt ? "EXPIRED" : "SUBMITTED",
+          submittedAt: now,
+          answerFileName: attachment?.fileName ?? null,
+          answerMimeType: attachment?.mimeType ?? null,
+          answerDocument: attachment?.document ?? null,
+        },
+      });
       await transaction.result.deleteMany({ where: { attemptId: attempt.id } });
       return transaction.result.create({ data: { attemptId: attempt.id, obtainedMarks, totalMarks, percentage, passed: percentage >= 50 } });
     });

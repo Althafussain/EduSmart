@@ -32,6 +32,9 @@ export async function POST(_request: Request, context: { params: Promise<{ quizI
           startedAt: true,
           submittedAt: true,
           expiresAt: true,
+          answerFileName: true,
+          answerMimeType: true,
+          answerDocument: true,
           result: { select: { obtainedMarks: true, totalMarks: true, percentage: true, passed: true } },
         },
       });
@@ -50,6 +53,9 @@ export async function POST(_request: Request, context: { params: Promise<{ quizI
           totalMarks: attempt.result?.totalMarks ?? null,
           percentage: attempt.result?.percentage ?? null,
           passed: attempt.result?.passed ?? null,
+          answerFileName: attempt.answerFileName,
+          answerMimeType: attempt.answerMimeType,
+          answerDocument: attempt.answerDocument,
         },
       });
       await transaction.studentAnswer.deleteMany({ where: { attemptId } });
