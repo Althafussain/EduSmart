@@ -139,7 +139,8 @@ export async function GET() {
           startedAt: true,
           submittedAt: true,
           expiresAt: true,
-          user: { select: { id: true, fullName: true, email: true } },
+          answerFileName: true,
+          user: { select: { id: true, fullName: true, email: true, mobileNumber: true } },
           result: { select: { obtainedMarks: true, totalMarks: true, percentage: true, passed: true } },
         },
       },
@@ -161,7 +162,8 @@ export async function GET() {
       totalMarks: true,
       percentage: true,
       passed: true,
-      user: { select: { id: true, fullName: true, email: true } },
+      answerFileName: true,
+      user: { select: { id: true, fullName: true, email: true, mobileNumber: true } },
     },
   });
   const historyByQuiz = new Map<string, typeof history>();
@@ -185,6 +187,7 @@ export async function GET() {
         startedAt: attempt.startedAt,
         submittedAt: attempt.submittedAt,
         expiresAt: attempt.expiresAt,
+        answerFileName: attempt.answerFileName,
         user: attempt.user,
         result: attempt.obtainedMarks === null || attempt.percentage === null || attempt.passed === null
           ? null

@@ -23,7 +23,8 @@ type QuizAttempt = {
   startedAt: string;
   submittedAt: string | null;
   expiresAt: string;
-  user: { id: string; fullName: string; email: string };
+  answerFileName: string | null;
+  user: { id: string; fullName: string; email: string; mobileNumber: string | null };
   result: { obtainedMarks: number; totalMarks: number | null; percentage: number; passed: boolean } | null;
   isHistory: boolean;
 };
@@ -334,16 +335,18 @@ export default function QuizExamManager() {
                   {quiz.attempts.length === 0
                     ? <p className="admin-empty">No students have started this quiz.</p>
                     : <div className="admin-results-table-wrap"><table className="admin-results-table">
-                      <thead><tr><th>Student</th><th>Email</th><th>Status</th><th>Started</th><th>Submitted</th><th>Marks</th><th>Score</th><th>Admin action</th></tr></thead>
+                      <thead><tr><th>Student</th><th>Email</th><th>Mobile</th><th>Status</th><th>Started</th><th>Submitted</th><th>Answer sheet</th><th>Marks</th><th>Score</th><th>Admin action</th></tr></thead>
                       <tbody>{quiz.attempts.map((attempt) => {
                         const inProgress = attempt.status === "IN_PROGRESS";
                         const result = attempt.result;
                         return <tr key={attempt.id}>
                           <td>{attempt.user.fullName}</td>
                           <td>{attempt.user.email}</td>
+                          <td>{attempt.user.mobileNumber || "Not provided"}</td>
                           <td>{result ? result.passed ? "Passed" : "Submitted" : inProgress ? "In progress" : "Expired"}</td>
                           <td>{new Date(attempt.startedAt).toLocaleString()}</td>
                           <td>{attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString() : "—"}</td>
+                          <td>{attempt.answerFileName ? <a href={`/api/admin/exams/${quiz.id}/attempts/${attempt.id}/answer-sheet`}>Download {attempt.answerFileName}</a> : "—"}</td>
                           <td>{result ? `${result.obtainedMarks} / ${result.totalMarks ?? quiz.questions.length}` : "Pending"}</td>
                           <td>{result ? `${result.percentage.toFixed(1)}%` : "—"}</td>
                           <td>{attempt.isHistory ? <span>Previous attempt</span> : <button

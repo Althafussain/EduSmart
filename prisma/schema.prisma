@@ -135,6 +135,9 @@ model ExamAttempt {
   startedAt   DateTime        @default(now())
   submittedAt DateTime?
   expiresAt   DateTime
+  answerFileName String?
+  answerMimeType String?
+  answerDocument Bytes?
   exam        Exam            @relation(fields: [examId], references: [id])
   user        User            @relation(fields: [userId], references: [id])
   answers     StudentAnswer[]
@@ -155,6 +158,9 @@ model QuizAttemptHistory {
   totalMarks    Float?
   percentage    Float?
   passed        Boolean?
+  answerFileName String?
+  answerMimeType String?
+  answerDocument Bytes?
   archivedAt    DateTime      @default(now())
   exam          Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)

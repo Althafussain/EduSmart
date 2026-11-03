@@ -18,7 +18,7 @@ export async function GET() {
     select: { id: true, title: true, subject: true, educationLevel: true, grade: true, stream: true, fileName: true, durationMins: true, published: true, createdAt: true },
   });
   const attempts = await prisma.writtenPaperAttempt.findMany({ where: { paperId: { in: papers.map((paper) => paper.id) }, submittedAt: { not: null } }, select: { id: true, paperId: true, userId: true, fileName: true, submittedAt: true }, orderBy: { submittedAt: "desc" } });
-  const users = await prisma.user.findMany({ where: { id: { in: [...new Set(attempts.map((attempt) => attempt.userId))] } }, select: { id: true, fullName: true, email: true } });
+  const users = await prisma.user.findMany({ where: { id: { in: [...new Set(attempts.map((attempt) => attempt.userId))] } }, select: { id: true, fullName: true, email: true, mobileNumber: true } });
   const userById = new Map(users.map((user) => [user.id, user]));
   const submissionsByPaper = new Map<string, typeof attempts>();
   for (const attempt of attempts) submissionsByPaper.set(attempt.paperId, [...(submissionsByPaper.get(attempt.paperId) ?? []), attempt]);
